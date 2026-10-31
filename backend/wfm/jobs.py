@@ -180,7 +180,7 @@ class Job(Reporter):
             "detail": {"scope": scope} if scope else {}, "message": None,
             "started_at": utc_now(), "finished_at": None,
         }
-        self._flush(start=True)
+        self._claim()
         self._thread = threading.Thread(target=self._heartbeat, args=(flush_seconds,), daemon=True)
         self._thread.start()
 
@@ -190,8 +190,6 @@ class Job(Reporter):
             db_path: Path | None = None, flush_seconds: float = FLUSH_SECONDS,
             on_stop: Callable[[], None] = _thread.interrupt_main, terminal: bool = True) -> Iterator[Job]:
         spec = JOBS[name]
-        if os.environ.get(LAUNCHED_BY_DASHBOARD) != name:
-            _refuse_if_running(Path(db_path or settings.db_path), name)
         job = cls(spec, total=total, scope=scope, db_path=Path(db_path or settings.db_path),
                   flush_seconds=flush_seconds, on_stop=on_stop)
         line = TerminalLine(lambda: spec.render(job.snapshot())).start() if terminal else None
@@ -271,39 +269,61 @@ class Job(Reporter):
             except sqlite3.Error:
                 pass  # a busy database must never take the job down; retry next tick
 
-    def _flush(self, *, start: bool = False) -> bool:
-        """Write the state; return True when the dashboard has asked the job to stop."""
+    def _values(self) -> tuple[Any, ...]:
+        """The state as jobs-table values, in the column order of _claim and _flush."""
         s = self.snapshot()
-        values = (s["status"], s["total"], s["done"], s["failed"], s["current"], json.dumps(s["detail"]),
-                  s["message"], s["started_at"], utc_now(), s["finished_at"], self.spec.name)
+        return (s["status"], s["total"], s["done"], s["failed"], s["current"], json.dumps(s["detail"]),
+                s["message"], s["started_at"], utc_now(), s["finished_at"], self.spec.name)
+
+    def _claim(self) -> None:
+        """Take over this job's row, refusing (JobConflict) while a live run holds it.
+
+        Check and write share one immediate transaction, as in start(), so two runs can never
+        both claim the row. The process the dashboard launched takes over the 'running' row
+        start() wrote for it, keeping a Stop clicked during startup; a stalled run's row is
+        reclaimed, with any Stop it left cleared.
+        """
+        launched = os.environ.get(LAUNCHED_BY_DASHBOARD) == self.spec.name
+        conn = sqlite3.connect(self._db_path, timeout=10, isolation_level=None)
+        conn.row_factory = sqlite3.Row
+        try:
+            conn.execute("BEGIN IMMEDIATE")
+            row = conn.execute("SELECT * FROM jobs WHERE name = ?", (self.spec.name,)).fetchone()
+            if row and _state(row) == "running" and not launched:
+                raise JobConflict(f"'{self.spec.name}' is already running (started {row['started_at']}). "
+                                  "Wait for it to finish, or stop it from the dashboard first.")
+            conn.execute(
+                """INSERT INTO jobs (status, total, done, failed, current, detail, message,
+                                     started_at, heartbeat_at, finished_at, name)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                   ON CONFLICT (name) DO UPDATE SET
+                     status = excluded.status, total = excluded.total, done = excluded.done,
+                     failed = excluded.failed, current = excluded.current, detail = excluded.detail,
+                     message = excluded.message, started_at = excluded.started_at,
+                     heartbeat_at = excluded.heartbeat_at, finished_at = excluded.finished_at,
+                     stop_requested = CASE WHEN jobs.status = 'running' THEN jobs.stop_requested ELSE 0 END""",
+                self._values(),
+            )
+            conn.execute("COMMIT")
+        finally:
+            conn.close()  # rolls back an unfinished transaction (a refused claim)
+
+    def _flush(self) -> bool:
+        """Write the state; return True when the dashboard has asked the job to stop."""
+        values = self._values()
+        status = values[0]
         conn = sqlite3.connect(self._db_path, timeout=10)
         try:
-            if start:
-                # Takes over the row the dashboard may have written when launching this
-                # job; keeps a Stop clicked during startup, clears one left by a dead run.
-                conn.execute(
-                    """INSERT INTO jobs (status, total, done, failed, current, detail, message,
-                                         started_at, heartbeat_at, finished_at, name)
-                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                       ON CONFLICT (name) DO UPDATE SET
-                         status = excluded.status, total = excluded.total, done = excluded.done,
-                         failed = excluded.failed, current = excluded.current, detail = excluded.detail,
-                         message = excluded.message, started_at = excluded.started_at,
-                         heartbeat_at = excluded.heartbeat_at, finished_at = excluded.finished_at,
-                         stop_requested = CASE WHEN jobs.status = 'running' THEN jobs.stop_requested ELSE 0 END""",
-                    values,
-                )
-            else:
-                conn.execute(
-                    """UPDATE jobs SET status = ?, total = ?, done = ?, failed = ?, current = ?, detail = ?,
-                                       message = ?, started_at = ?, heartbeat_at = ?, finished_at = ?,
-                                       stop_requested = CASE WHEN ? = 'running' THEN stop_requested ELSE 0 END
-                       WHERE name = ?""",
-                    (*values[:-1], s["status"], self.spec.name),
-                )
+            conn.execute(
+                """UPDATE jobs SET status = ?, total = ?, done = ?, failed = ?, current = ?, detail = ?,
+                                   message = ?, started_at = ?, heartbeat_at = ?, finished_at = ?,
+                                   stop_requested = CASE WHEN ? = 'running' THEN stop_requested ELSE 0 END
+                   WHERE name = ?""",
+                (*values[:-1], status, self.spec.name),
+            )
             conn.commit()
             row = conn.execute("SELECT stop_requested FROM jobs WHERE name = ?", (self.spec.name,)).fetchone()
-            return bool(row and row[0]) and s["status"] == "running"
+            return bool(row and row[0]) and status == "running"
         finally:
             conn.close()
 
@@ -316,20 +336,6 @@ def _nothing() -> Iterator[None]:
 # ---------------------------------------------------------------------------
 # Controlling jobs (from the dashboard's API process)
 # ---------------------------------------------------------------------------
-
-def _refuse_if_running(db_path: Path, name: str) -> None:
-    """A run not launched by the dashboard must not take over a live run's row. Raises JobConflict."""
-    conn = sqlite3.connect(db_path, timeout=10)
-    conn.row_factory = sqlite3.Row
-    try:
-        has_jobs = conn.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'jobs'").fetchone()
-        row = conn.execute("SELECT * FROM jobs WHERE name = ?", (name,)).fetchone() if has_jobs else None
-    finally:
-        conn.close()
-    if row and _state(row) == "running":
-        raise JobConflict(f"'{name}' is already running (started {row['started_at']}). "
-                          "Wait for it to finish, or stop it from the dashboard first.")
-
 
 def _state(row: sqlite3.Row) -> str:
     """The stored status, except a 'running' job with a silent heartbeat is 'stalled'."""
