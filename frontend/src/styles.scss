@@ -1,0 +1,470 @@
+// Tokens: warframe.market's palette (sampled from the site; see PRODUCT.md), dark only.
+// Slate-teal grounds, their interactive teal for the active place / selection / primary action / focus,
+// their green for rises and live state. Chart series are dataviz-validated against --surface-1; charts
+// reference roles, never raw hex.
+
+:root {
+  color-scheme: dark;
+  --page: #101619;
+  --rail: #171e21; // the site's header chrome
+  --surface-1: #171e21; // panels: the site's section bands
+  --surface-2: #1e282c; // raised: selected rows, code, thumbnails
+  --well: #071013; // inputs and control tracks
+  --text-primary: #c5c7c8;
+  --text-secondary: #a4a9aa;
+  --text-muted: #80888b;
+  --grid: #232d31;
+  --axis: #34444a;
+  --border: rgba(197, 199, 200, 0.1);
+  --hover-wash: rgba(65, 143, 165, 0.08);
+  --series-1: #35a3ba; // completed trades: the site's logo cyan, stepped into the chart band
+  --series-2: #b43e8b; // sell listings: the site's "Want to Sell" magenta, deepened for colour-blind separation
+  --series-1-wash: rgba(53, 163, 186, 0.12);
+  --seq-250: #1f4f5c;
+  --accent: #418fa5; // the site's interactive teal
+  --accent-hover: #4d9db3;
+  --accent-line: rgba(65, 143, 165, 0.55);
+  --accent-wash: rgba(65, 143, 165, 0.14);
+  --on-accent: #071013;
+  --meter-track: #21404a; // the site's dark teal button
+  --delta-up: #1bb194; // the site's green
+  --status-good: #1bb194;
+  --status-warning: #f0b43c;
+  --status-critical: #e5683a; // the site's place-order orange, lightened for text
+  --focus: var(--accent);
+  --font: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: "Chakra Petch", var(--font);
+  // Corner language: Warframe's bevelled UI tiles (top-left and bottom-right cut), at panel and control size.
+  // Browsers without corner-shape get small round corners instead.
+  --corner: round;
+  --r-panel: 6px;
+  --r-control: 4px;
+}
+
+@supports (corner-shape: bevel) {
+  :root {
+    --corner: bevel;
+    --r-panel: 12px 0 12px 0;
+    --r-control: 7px 0 7px 0;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Base
+// ---------------------------------------------------------------------------
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+}
+
+html {
+  scrollbar-color: var(--axis) var(--page);
+}
+
+body {
+  background: var(--page);
+  color: var(--text-primary);
+  font: 14px/1.5 var(--font);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: rgba(65, 143, 165, 0.4);
+  color: var(--text-primary);
+}
+
+a {
+  color: inherit;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--axis);
+
+  &:hover {
+    text-decoration-color: var(--accent);
+  }
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 600;
+}
+
+// Page titles read like the game's screen titles.
+h1 {
+  font-size: 26px;
+  line-height: 1.15;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+h2 {
+  font-size: 16px;
+  letter-spacing: 0.01em;
+}
+
+h3 {
+  font-size: 13.5px;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+input,
+select {
+  caret-color: var(--accent);
+}
+
+.muted {
+  color: var(--text-muted);
+}
+
+.secondary {
+  color: var(--text-secondary);
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+code,
+.mono {
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-size: 12.5px;
+}
+
+code {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+  corner-shape: var(--corner);
+  padding: 1px 5px;
+}
+
+// ---------------------------------------------------------------------------
+// Layout pieces
+// ---------------------------------------------------------------------------
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 28px 32px 48px;
+  max-width: 1320px;
+}
+
+.page-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+
+  p {
+    margin: 6px 0 0;
+    color: var(--text-secondary);
+  }
+}
+
+.grid {
+  display: grid;
+  gap: 16px;
+}
+
+.grid-2 {
+  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+}
+
+.kpi-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.card {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--r-panel);
+  corner-shape: var(--corner);
+  padding: 18px 20px;
+  min-width: 0;
+}
+
+.card-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+
+  p {
+    margin: 2px 0 0;
+    font-size: 12.5px;
+    color: var(--text-muted);
+  }
+}
+
+// One filter row above everything it scopes.
+.filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+// ---------------------------------------------------------------------------
+// Controls
+// ---------------------------------------------------------------------------
+
+.input,
+.select {
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+  corner-shape: var(--corner);
+  background: var(--well);
+  color: var(--text-primary);
+  font: inherit;
+
+  &::placeholder {
+    color: var(--text-muted);
+  }
+
+  &:hover {
+    border-color: var(--axis);
+  }
+}
+
+.input {
+  min-width: 240px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+  corner-shape: var(--corner);
+  background: var(--surface-1);
+  color: var(--text-primary);
+  font: inherit;
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+
+  &:hover {
+    background: var(--hover-wash);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+
+  &.primary {
+    background: var(--accent);
+    border-color: transparent;
+    color: var(--on-accent);
+    font-weight: 600;
+
+    &:hover {
+      background: var(--accent-hover);
+    }
+  }
+
+  &.ghost {
+    border-color: transparent;
+    background: transparent;
+
+    &:hover {
+      background: var(--hover-wash);
+    }
+  }
+
+  &.small {
+    height: 28px;
+    padding: 0 9px;
+    font-size: 12.5px;
+  }
+}
+
+// Segmented control for presets (range, rank).
+.segmented {
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+  corner-shape: var(--corner);
+  background: var(--well);
+
+  button {
+    height: 28px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: var(--r-control);
+    corner-shape: var(--corner);
+    background: transparent;
+    color: var(--text-secondary);
+    font: inherit;
+    cursor: pointer;
+
+    &:hover {
+      background: var(--hover-wash);
+    }
+
+    &[aria-pressed="true"] {
+      background: var(--accent-wash);
+      color: var(--text-primary);
+      font-weight: 600;
+      box-shadow: inset 0 0 0 1px var(--accent-line);
+    }
+  }
+}
+
+.chip {
+  display: inline-block;
+  padding: 1px 7px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+  corner-shape: var(--corner);
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  line-height: 18px;
+  white-space: nowrap;
+}
+
+// ---------------------------------------------------------------------------
+// Tables
+// ---------------------------------------------------------------------------
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+table.data {
+  width: 100%;
+  border-collapse: collapse;
+
+  th,
+  td {
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--grid);
+    text-align: left;
+    vertical-align: middle;
+  }
+
+  th {
+    border-bottom-color: var(--axis);
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  td.r,
+  th.r {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  tbody tr:hover {
+    background: var(--hover-wash);
+  }
+
+  tbody tr:last-child td {
+    border-bottom: 0;
+  }
+}
+
+// Value deltas: sign + arrow + color, never color alone.
+.delta-up {
+  color: var(--delta-up);
+}
+
+.delta-down {
+  color: var(--status-critical);
+}
+
+// ---------------------------------------------------------------------------
+// Chart chrome shared by the SVG chart components
+// ---------------------------------------------------------------------------
+
+.chart-tooltip {
+  position: absolute;
+  z-index: 5;
+  pointer-events: none;
+  min-width: 140px;
+  padding: 8px 10px;
+  border: 1px solid var(--axis);
+  border-radius: var(--r-control);
+  corner-shape: var(--corner);
+  background: var(--surface-2);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+  font-size: 12.5px;
+
+  .tt-title {
+    color: var(--text-muted);
+    margin-bottom: 4px;
+  }
+
+  .tt-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .tt-key {
+    width: 12px;
+    height: 2px;
+    border-radius: 1px;
+  }
+
+  .tt-value {
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .tt-label {
+    color: var(--text-secondary);
+  }
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+
+  .legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .key-line {
+    width: 14px;
+    height: 2px;
+    border-radius: 1px;
+  }
+
+  .key-rect {
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+  }
+}

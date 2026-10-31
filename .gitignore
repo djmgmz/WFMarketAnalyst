@@ -1,0 +1,21 @@
+# Python
+backend/.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Local data (SQLite database and logs)
+data/
+
+# Node / Angular (frontend/.gitignore covers the rest)
+node_modules/
+
+# Personal Claude Code settings
+.claude/settings.local.json
+
+# Markdown: keep only the main README
+*.md
+!/README.md
+
+# Third-party Claude Code skills (kept locally, see .claude/skills/SOURCES.md)
+.claude/skills/

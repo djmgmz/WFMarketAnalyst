@@ -1,0 +1,31 @@
+import { ChangeDetectionStrategy, Component, computed, input, signal } from '@angular/core';
+
+import { assetUrl } from '../core/format';
+
+/** Item icon from the warframe.market static assets, with a lettered fallback. */
+@Component({
+  selector: 'app-item-thumb',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `
+    @if (src() && !failed()) {
+      <img [src]="src()" [alt]="''" [width]="size()" [height]="size()" loading="lazy" (error)="failed.set(true)" />
+    } @else {
+      <span class="fallback" [style.width.px]="size()" [style.height.px]="size()">{{ name().charAt(0) }}</span>
+    }
+  `,
+  styles: `
+    :host { display: inline-flex; flex: none; }
+    img { object-fit: contain; border-radius: var(--r-control); corner-shape: var(--corner); background: var(--surface-2); }
+    .fallback { display: inline-flex; align-items: center; justify-content: center; border-radius: var(--r-control);
+                corner-shape: var(--corner); border: 1px solid var(--border); background: var(--surface-2);
+                color: var(--text-secondary); font-family: var(--font-display); font-weight: 600; }
+  `,
+})
+export class ItemThumbComponent {
+  readonly path = input<string | null>(null);
+  readonly name = input('');
+  readonly size = input(28);
+
+  protected readonly failed = signal(false);
+  protected readonly src = computed(() => assetUrl(this.path()));
+}

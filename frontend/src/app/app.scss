@@ -1,0 +1,181 @@
+.shell {
+  display: grid;
+  grid-template-columns: 232px 1fr;
+  min-height: 100vh;
+}
+
+.sidebar {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  height: 100vh;
+  padding: 20px 14px;
+  border-right: 1px solid var(--border);
+  background: var(--rail);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 8px;
+  text-decoration: none;
+}
+
+.brand-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--accent-line);
+  border-radius: var(--r-control);
+  corner-shape: var(--corner);
+  background: var(--accent-wash);
+  color: var(--accent);
+}
+
+.brand-name {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+}
+
+.brand-sub {
+  display: block;
+  color: var(--text-muted);
+  font-size: 11.5px;
+}
+
+nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.nav-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--r-control);
+  corner-shape: var(--corner);
+  color: var(--text-secondary);
+  font-family: var(--font-display);
+  font-size: 14.5px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-decoration: none;
+  transition: background-color 150ms ease-out, color 150ms ease-out;
+
+  &:hover {
+    background: var(--hover-wash);
+    color: var(--text-primary);
+  }
+
+  // The current place is the one accent-coloured thing in the rail.
+  &.active {
+    border-color: var(--accent-line);
+    background: var(--accent-wash);
+    color: var(--text-primary);
+    font-weight: 600;
+
+    .nav-icon {
+      color: var(--accent);
+    }
+  }
+}
+
+.nav-icon {
+  color: var(--text-muted);
+}
+
+.job-pills {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.job-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+  corner-shape: var(--corner);
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  text-decoration: none;
+
+  &:hover {
+    background: var(--hover-wash);
+  }
+
+  .pill-icon {
+    color: var(--accent);
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  &.stalled .pill-icon {
+    color: var(--status-warning);
+    animation: none;
+  }
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .job-pill .pill-icon {
+    animation: none;
+  }
+}
+
+.sidebar-foot {
+  margin-top: auto;
+  padding: 0 4px;
+
+  p {
+    margin: 0 4px;
+    color: var(--text-muted);
+    font-size: 11.5px;
+    line-height: 1.45;
+  }
+}
+
+.content {
+  min-width: 0;
+}
+
+@media (max-width: 860px) {
+  .shell {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    position: static;
+    height: auto;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  nav {
+    flex-direction: row;
+  }
+
+  .sidebar-foot {
+    display: none;
+  }
+}

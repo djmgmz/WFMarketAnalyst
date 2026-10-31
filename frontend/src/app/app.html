@@ -1,0 +1,37 @@
+<div class="shell">
+  <aside class="sidebar">
+    <a class="brand" routerLink="/overview">
+      <span class="brand-mark" aria-hidden="true"><app-icon name="ducats" [size]="16" /></span>
+      <span>
+        <span class="brand-name">WF Market Analyst</span>
+        <span class="brand-sub">warframe.market insights</span>
+      </span>
+    </a>
+
+    <nav aria-label="Main">
+      @for (link of nav; track link.path) {
+        <a class="nav-link" [routerLink]="link.path" routerLinkActive="active" ariaCurrentWhenActive="page">
+          <app-icon class="nav-icon" [name]="link.icon" />{{ link.label }}
+        </a>
+      }
+    </nav>
+
+    @if (jobPills().length) {
+      <div class="job-pills" aria-label="Running jobs" aria-live="polite">
+        @for (pill of jobPills(); track pill.name) {
+          <a class="job-pill" routerLink="/overview" [class.stalled]="pill.stalled">
+            <app-icon class="pill-icon" [name]="pill.stalled ? 'warning' : 'running'" [size]="12" />{{ pill.label }}
+          </a>
+        }
+      </div>
+    }
+
+    <div class="sidebar-foot">
+      <p>Data from the warframe.market public API. Not affiliated with warframe.market or Digital Extremes.</p>
+    </div>
+  </aside>
+
+  <main class="content">
+    <router-outlet />
+  </main>
+</div>
