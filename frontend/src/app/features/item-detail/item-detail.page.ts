@@ -25,7 +25,7 @@ import { ItemThumbComponent } from '../../shared/item-thumb.component';
         <app-empty-state title="Item not found">No item with the slug <code>{{ slug() }}</code> is in the catalog.</app-empty-state>
       } @else if (item.value(); as it) {
         <header class="hero">
-          <app-item-thumb [path]="it.icon" [name]="it.name" [size]="72" />
+          <app-item-thumb [image]="it.image" [name]="it.name" [size]="72" />
           <div class="hero-text">
             <h1>{{ it.name }}</h1>
             <div class="chips">
@@ -139,7 +139,7 @@ import { ItemThumbComponent } from '../../shared/item-thumb.component';
                 @for (part of it.setItems; track part.id) {
                   <tr>
                     <td><a class="item-link" [routerLink]="['/items', part.slug]">
-                      <app-item-thumb [path]="part.thumb" [name]="part.name" [size]="24" />{{ part.name }}</a></td>
+                      <app-item-thumb [image]="part.image" [name]="part.name" [size]="24" />{{ part.name }}</a></td>
                     <td class="r">{{ num(part.quantity_in_set) }}</td>
                     <td class="r">{{ num(part.ducats) }}</td>
                     <td class="r">{{ plat(part.price) }}</td>

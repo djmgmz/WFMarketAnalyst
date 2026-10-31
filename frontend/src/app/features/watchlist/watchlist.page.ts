@@ -32,7 +32,7 @@ import { ItemThumbComponent } from '../../shared/item-thumb.component';
                 @for (row of rows(); track row.id) {
                   <tr>
                     <td><a class="item-link" [routerLink]="['/items', row.slug]">
-                      <app-item-thumb [path]="row.thumb" [name]="row.name" />{{ row.name }}</a></td>
+                      <app-item-thumb [image]="row.image" [name]="row.name" />{{ row.name }}</a></td>
                     <td class="r">{{ plat(row.price) }}</td>
                     <td class="r">{{ plat(row.best_sell) }}
                       @if (row.snapshot_at) { <div class="muted small">{{ ago(row.snapshot_at) }}</div> }</td>

@@ -13,7 +13,7 @@ T = TypeVar("T")
 
 from .config import settings
 from .db import session
-from .jobs import Job, Scope, backfill_targets
+from .jobs import Job, JobConflict, Scope, backfill_targets
 from .market import HttpMarket, Market
 
 
@@ -97,6 +97,23 @@ def _cmd_forecast(_: argparse.Namespace) -> None:
     print(f"Forecast trained: {job.message}" if job.status == "finished" else "Stopped. No forecasts were changed.")
 
 
+def _cmd_sync_images(_: argparse.Namespace) -> None:
+    from .images import HttpImageSource, sync_images
+
+    async def run(conn, job: Job) -> dict[str, int]:
+        async with HttpImageSource() as source:
+            return await sync_images(conn, source, settings.images_dir, job)
+
+    with session() as conn, Job.run("sync-images") as job:
+        summary = asyncio.run(run(conn, job))
+        job.message = (f"{summary['matched']} of {summary['items']} items have an image; "
+                       f"{summary['downloaded']} files downloaded, {summary['failed']} failed")
+    if job.status == "stopped":
+        print("Stopped. Images saved so far are kept; run sync-images again to resume.")
+    else:
+        print(json.dumps(summary, indent=2))
+
+
 def _forecast_summary(report: dict) -> str:
     week = report["horizons"][str(max(int(h) for h in report["horizons"]))]
     skill = week["overall"].get("skill")
@@ -143,6 +160,9 @@ def main() -> None:
     sub.add_parser("forecast", help="train the price forecast and store fresh forecasts (no network)") \
         .set_defaults(func=_cmd_forecast)
 
+    sub.add_parser("sync-images", help="download item images from the Warframe community database (resumable)") \
+        .set_defaults(func=_cmd_sync_images)
+
     p = sub.add_parser("serve", help="run the dashboard API")
     p.add_argument("--host", default="127.0.0.1")
     p.add_argument("--port", type=int, default=8000)
@@ -156,7 +176,10 @@ def main() -> None:
         datefmt="%H:%M:%S",
     )
     logging.getLogger("httpx").setLevel(logging.WARNING)
-    args.func(args)
+    try:
+        args.func(args)
+    except JobConflict as exc:
+        raise SystemExit(str(exc)) from None
 
 
 if __name__ == "__main__":

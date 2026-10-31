@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS items (
     icon              TEXT,
     thumb             TEXT,
     sub_icon          TEXT,
+    image             TEXT,                     -- file in data/images/, set by the item-images job
     list_synced_at    TEXT NOT NULL,
     detail_synced_at  TEXT                      -- NULL until /v2/item/{slug} has been fetched
 );

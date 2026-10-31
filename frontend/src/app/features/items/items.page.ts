@@ -81,7 +81,7 @@ const SORTS: { value: NonNullable<ItemQuery['sort']>; label: string }[] = [
                   <tr>
                     <td>
                       <a class="item-link" [routerLink]="['/items', item.slug]">
-                        <app-item-thumb [path]="item.thumb" [name]="item.name" />
+                        <app-item-thumb [image]="item.image" [name]="item.name" />
                         <span>{{ item.name }}</span>
                         @if (item.watched) { <span class="watched" title="On watchlist" aria-label="On watchlist">★</span> }
                       </a>

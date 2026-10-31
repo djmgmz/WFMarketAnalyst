@@ -205,7 +205,7 @@ const SEGMENT_LABELS: Record<string, string> = { category: 'Category', band: 'Pr
             @for (f of asRows(rows); track f.item.slug + ':' + f.rank) {
               <tr>
                 <td><a class="item-link" [routerLink]="['/items', f.item.slug]">
-                  <app-item-thumb [path]="f.item.thumb" [name]="f.item.name" [size]="22" />{{ f.item.name }}</a>
+                  <app-item-thumb [image]="f.item.image" [name]="f.item.name" [size]="22" />{{ f.item.name }}</a>
                   @if (f.rank !== null) { <span class="muted"> · rank {{ f.rank }}</span> }</td>
                 <td class="r">{{ plat(f.base_price) }}</td>
                 <td class="r">{{ plat(f.predicted) }}</td>

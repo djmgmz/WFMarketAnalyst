@@ -1,11 +1,5 @@
 // Display formatting shared by pages and charts.
 
-export const ASSETS_BASE = 'https://warframe.market/static/assets/';
-
-export function assetUrl(path: string | null | undefined): string | null {
-  return path ? ASSETS_BASE + path : null;
-}
-
 const full = new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 });
 const compact = new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 });
 

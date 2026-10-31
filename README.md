@@ -27,6 +27,8 @@ It's a demonstration, not trading advice. Game updates and in-game events can mo
 
 All data comes from the public warframe.market API, and the project follows its usage rules. Requests are rate-limited to stay below the published limit of three per second, every request identifies the application, and downloaded data is stored locally so it is never requested twice unnecessarily.
 
+Item images come from the Warframe community's open item database ([WFCD warframe-items](https://github.com/WFCD/warframe-items)). They are downloaded once and kept on your computer; they are not part of this repository.
+
 This project is not affiliated with warframe.market or with Digital Extremes, the developer of Warframe. The colour scheme follows warframe.market's for familiarity; the name, logo and layout are original.
 
 ## How it's put together
@@ -61,7 +63,7 @@ npm start
 
 Then open http://localhost:4200.
 
-The first time, the dashboard is mostly empty because there's no price history yet. On the Overview page, start **Price history backfill** for a category (Arcane is a quick one to begin with), then **Price forecast** once it's done. Running the backfill again each day keeps the history growing.
+The first time, the dashboard is mostly empty because there's no price history yet. On the Overview page, start **Price history backfill** for a category (Arcane is a quick one to begin with), then **Price forecast** once it's done. **Item images** fetches a picture for nearly every item (about 70 MB, a few minutes). Running the backfill again each day keeps the history growing.
 
 If you share your copy, set the `WFM_CONTACT` environment variable to your email or repository link, so the warframe.market team can see who is asking for data.
 

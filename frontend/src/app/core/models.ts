@@ -15,8 +15,8 @@ export interface ItemSummary {
   req_mastery_rank: number | null;
   trading_tax: number | null;
   vaulted: boolean | null;
-  thumb: string | null;
-  icon: string | null;
+  /** File name under /api/images/, set by the item-images job; null when there is no image. */
+  image: string | null;
   price: number | null;
   watched?: boolean;
 }
@@ -159,7 +159,7 @@ export interface RecentOrder {
   created_at: string;
   slug: string;
   name: string;
-  thumb: string | null;
+  image: string | null;
   category: Category;
 }
 

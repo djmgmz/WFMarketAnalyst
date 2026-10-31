@@ -70,7 +70,7 @@ import { StatTileComponent } from '../../shared/stat-tile.component';
                   @for (m of moverRows(); track m.key) {
                     <tr>
                       <td><a class="item-link" [routerLink]="['/items', m.slug]">
-                        <app-item-thumb [path]="m.thumb" [name]="m.name" [size]="22" />{{ m.name }}</a>
+                        <app-item-thumb [image]="m.image" [name]="m.name" [size]="22" />{{ m.name }}</a>
                         @if (m.rank !== null) { <span class="muted"> · rank {{ m.rank }}</span> }</td>
                       <td class="r">{{ plat(m.from) }}</td>
                       <td class="r">{{ plat(m.to) }}</td>
@@ -101,7 +101,7 @@ import { StatTileComponent } from '../../shared/stat-tile.component';
                 @for (m of predictedRows(); track m.key) {
                   <tr>
                     <td><a class="item-link" [routerLink]="['/items', m.item.slug]">
-                      <app-item-thumb [path]="m.item.thumb" [name]="m.item.name" [size]="22" />{{ m.item.name }}</a>
+                      <app-item-thumb [image]="m.item.image" [name]="m.item.name" [size]="22" />{{ m.item.name }}</a>
                       @if (m.rank !== null) { <span class="muted"> · rank {{ m.rank }}</span> }</td>
                     <td class="r">{{ plat(m.base_price) }}</td>
                     <td class="r">{{ plat(m.predicted) }}</td>
@@ -134,7 +134,7 @@ import { StatTileComponent } from '../../shared/stat-tile.component';
                   @for (order of recent.value(); track order.id) {
                     <tr>
                       <td><a class="item-link" [routerLink]="['/items', order.slug]">
-                        <app-item-thumb [path]="order.thumb" [name]="order.name" [size]="22" />{{ order.name }}</a></td>
+                        <app-item-thumb [image]="order.image" [name]="order.name" [size]="22" />{{ order.name }}</a></td>
                       <td><span class="chip">{{ order.type === 'sell' ? 'Selling' : 'Buying' }}</span></td>
                       <td class="r">{{ plat(order.platinum) }}</td>
                       <td class="r">{{ order.quantity }}</td>
@@ -179,7 +179,7 @@ export class OverviewPage {
     const m = this.movers.value();
     if (!m) return [];
     return [...m.gainers.slice(0, 4), ...m.losers.slice(0, 4)]
-      .map((r) => ({ key: `${r.item.slug}-${r.rank}`, slug: r.item.slug, name: r.item.name, thumb: r.item.thumb, ...r }));
+      .map((r) => ({ key: `${r.item.slug}-${r.rank}`, slug: r.item.slug, name: r.item.name, image: r.item.image, ...r }));
   });
 
   protected readonly predictedRows = computed(() => {

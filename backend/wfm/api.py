@@ -11,9 +11,11 @@ from typing import Any, Literal
 
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from . import __version__, forecast, jobs, prices
+from .images import SAFE_NAME
 from .catalog import CATEGORIES
 from .market import HttpMarket, MarketError
 from .config import settings
@@ -54,7 +56,7 @@ Db = Depends(get_db)
 
 SUMMARY_COLUMNS = """
     i.id, i.slug, i.name, i.category, i.tags, i.rarity, i.max_rank, i.ducats,
-    i.req_mastery_rank, i.trading_tax, i.vaulted, i.thumb, i.icon
+    i.req_mastery_rank, i.trading_tax, i.vaulted, i.image
 """
 
 # Item fields plus the latest price (item_prices view). Use as `FROM items i {PRICED}`.
@@ -97,9 +99,18 @@ def health() -> dict[str, Any]:
     return {"ok": True, "version": __version__}
 
 
+@app.get("/api/images/{name}")
+def item_image(name: str) -> FileResponse:
+    """An item image saved by the item-images job (items.image names the file)."""
+    path = settings.images_dir / name
+    if not SAFE_NAME.match(name) or not path.is_file():
+        raise HTTPException(404, "No such image")
+    return FileResponse(path, headers={"Cache-Control": "public, max-age=604800"})
+
+
 @app.get("/api/config")
 def config() -> dict[str, Any]:
-    return {"assetsBase": settings.assets_base, "platform": settings.platform, "crossplay": settings.crossplay}
+    return {"platform": settings.platform, "crossplay": settings.crossplay}
 
 
 @app.get("/api/overview")
@@ -318,7 +329,7 @@ def recent_orders(
     type: Literal["buy", "sell"] | None = None,
 ) -> list[dict[str, Any]]:
     sql = """SELECT o.id, o.type, o.platinum, o.quantity, o.rank, o.user_name, o.user_reputation,
-                    o.user_status, o.created_at, i.slug, i.name, i.thumb, i.category
+                    o.user_status, o.created_at, i.slug, i.name, i.image, i.category
              FROM orders_seen o JOIN items i ON i.id = o.item_id"""
     args: list[Any] = []
     if type:

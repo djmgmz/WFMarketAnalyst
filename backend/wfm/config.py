@@ -23,7 +23,6 @@ class Settings:
     )
     api_base: str = _env("WFM_API_BASE", "https://api.warframe.market")
     ws_url: str = _env("WFM_WS_URL", "wss://ws.warframe.market/socket")
-    assets_base: str = "https://warframe.market/static/assets/"
     platform: str = _env("WFM_PLATFORM", "pc")
     crossplay: bool = _env("WFM_CROSSPLAY", "true").lower() == "true"
     language: str = "en"
@@ -39,6 +38,11 @@ class Settings:
     def rate_limit_path(self) -> Path:
         """State file for the rate limiter shared by every wfm process."""
         return self.db_path.parent / "ratelimit.db"
+
+    @property
+    def images_dir(self) -> Path:
+        """Item images downloaded by the item-images job (never committed: data/ is ignored)."""
+        return self.db_path.parent / "images"
 
     @property
     def user_agent(self) -> str:

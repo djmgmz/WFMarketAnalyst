@@ -56,6 +56,10 @@ class JobConflict(RuntimeError):
     """The job is already running."""
 
 
+# Set on processes the dashboard launches: they take over the 'running' row start() wrote for them.
+LAUNCHED_BY_DASHBOARD = "WFM_LAUNCHED_JOB"
+
+
 # ---------------------------------------------------------------------------
 # Job definitions
 # ---------------------------------------------------------------------------
@@ -136,6 +140,8 @@ JOBS: dict[str, JobSpec] = {spec.name: spec for spec in (
             args=lambda _: ["sync-catalog"], render=progress_line("Catalog sync")),
     JobSpec("train-forecast", "Price forecast", "progress", resumable=False,
             args=lambda _: ["forecast"], render=progress_line("Forecast"), unit="steps"),
+    JobSpec("sync-images", "Item images", "progress", resumable=True,
+            args=lambda _: ["sync-images"], render=progress_line("Images"), unit="images"),
 )}
 
 
@@ -184,6 +190,8 @@ class Job(Reporter):
             db_path: Path | None = None, flush_seconds: float = FLUSH_SECONDS,
             on_stop: Callable[[], None] = _thread.interrupt_main, terminal: bool = True) -> Iterator[Job]:
         spec = JOBS[name]
+        if os.environ.get(LAUNCHED_BY_DASHBOARD) != name:
+            _refuse_if_running(Path(db_path or settings.db_path), name)
         job = cls(spec, total=total, scope=scope, db_path=Path(db_path or settings.db_path),
                   flush_seconds=flush_seconds, on_stop=on_stop)
         line = TerminalLine(lambda: spec.render(job.snapshot())).start() if terminal else None
@@ -309,6 +317,20 @@ def _nothing() -> Iterator[None]:
 # Controlling jobs (from the dashboard's API process)
 # ---------------------------------------------------------------------------
 
+def _refuse_if_running(db_path: Path, name: str) -> None:
+    """A run not launched by the dashboard must not take over a live run's row. Raises JobConflict."""
+    conn = sqlite3.connect(db_path, timeout=10)
+    conn.row_factory = sqlite3.Row
+    try:
+        has_jobs = conn.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'jobs'").fetchone()
+        row = conn.execute("SELECT * FROM jobs WHERE name = ?", (name,)).fetchone() if has_jobs else None
+    finally:
+        conn.close()
+    if row and _state(row) == "running":
+        raise JobConflict(f"'{name}' is already running (started {row['started_at']}). "
+                          "Wait for it to finish, or stop it from the dashboard first.")
+
+
 def _state(row: sqlite3.Row) -> str:
     """The stored status, except a 'running' job with a silent heartbeat is 'stalled'."""
     if row["status"] == "running" and seconds_since(row["heartbeat_at"]) > STALE_SECONDS:
@@ -409,6 +431,6 @@ def _spawn(name: str, args: list[str]) -> None:
             [sys.executable, "-m", "wfm", *args], cwd=PROJECT_ROOT / "backend",
             stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
             env={**os.environ, "WFM_DB_PATH": str(settings.db_path), "PYTHONUNBUFFERED": "1",
-                 "PYTHONIOENCODING": "utf-8"},
+                 "PYTHONIOENCODING": "utf-8", LAUNCHED_BY_DASHBOARD: name},
             **detach,
         )

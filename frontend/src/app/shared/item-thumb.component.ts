@@ -1,8 +1,6 @@
-import { ChangeDetectionStrategy, Component, computed, input, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, linkedSignal } from '@angular/core';
 
-import { assetUrl } from '../core/format';
-
-/** Item icon from the warframe.market static assets, with a lettered fallback. */
+/** Item image saved by the item-images job (served at /api/images), with a lettered fallback. */
 @Component({
   selector: 'app-item-thumb',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -22,10 +20,12 @@ import { assetUrl } from '../core/format';
   `,
 })
 export class ItemThumbComponent {
-  readonly path = input<string | null>(null);
+  /** File name from the item's `image` field; null until the item-images job has fetched it. */
+  readonly image = input<string | null>(null);
   readonly name = input('');
   readonly size = input(28);
 
-  protected readonly failed = signal(false);
-  protected readonly src = computed(() => assetUrl(this.path()));
+  protected readonly src = computed(() => (this.image() ? `/api/images/${encodeURIComponent(this.image()!)}` : null));
+  /** A broken image falls back to the letter; a new image gets a fresh try. */
+  protected readonly failed = linkedSignal({ source: this.src, computation: () => false });
 }

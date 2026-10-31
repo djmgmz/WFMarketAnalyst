@@ -57,7 +57,7 @@ import { StatTileComponent } from '../../shared/stat-tile.component';
                 @for (row of filtered(); track row.id) {
                   <tr>
                     <td><a class="item-link" [routerLink]="['/items', row.slug]">
-                      <app-item-thumb [path]="row.thumb" [name]="row.name" [size]="24" />{{ row.name }}</a>
+                      <app-item-thumb [image]="row.image" [name]="row.name" [size]="24" />{{ row.name }}</a>
                       @if (row.vaulted) { <span class="chip">Vaulted</span> }</td>
                     <td class="r">{{ num(row.ducats) }}</td>
                     <td class="r">{{ plat(row.price) }}</td>

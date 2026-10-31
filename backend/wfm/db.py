@@ -57,6 +57,7 @@ def connect(db_path: Path | None = None) -> sqlite3.Connection:
 # CREATE TABLE IF NOT EXISTS does not touch existing tables, so add them here.
 MIGRATIONS: list[tuple[str, str, str]] = [
     ("jobs", "stop_requested", "INTEGER NOT NULL DEFAULT 0"),
+    ("items", "image", "TEXT"),
 ]
 
 
