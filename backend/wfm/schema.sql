@@ -125,6 +125,7 @@ CREATE TABLE IF NOT EXISTS price_stats (
     donch_top    REAL,
     donch_bot    REAL,
     fetched_at   TEXT NOT NULL,
+    suspect      INTEGER NOT NULL DEFAULT 0,  -- completed-trade row that looks faked; see prices.flag_suspect
     PRIMARY KEY (item_id, source, granularity, bucket, mod_rank, subtype, order_type)
 );
 
@@ -140,6 +141,7 @@ SELECT i.id AS item_id,
        (SELECT ps.median FROM price_stats ps
          WHERE ps.item_id = i.id AND ps.source = 'closed' AND ps.granularity = 'day'
            AND ps.mod_rank = CASE WHEN i.max_rank IS NULL THEN -1 ELSE 0 END
+           AND ps.suspect = 0
          ORDER BY ps.bucket DESC LIMIT 1) AS price
 FROM items i;
 

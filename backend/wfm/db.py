@@ -58,15 +58,18 @@ def connect(db_path: Path | None = None) -> sqlite3.Connection:
 MIGRATIONS: list[tuple[str, str, str]] = [
     ("jobs", "stop_requested", "INTEGER NOT NULL DEFAULT 0"),
     ("items", "image", "TEXT"),
+    ("price_stats", "suspect", "INTEGER NOT NULL DEFAULT 0"),
 ]
 
 
 def init_db(conn: sqlite3.Connection) -> None:
-    conn.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
+    # Migrate existing tables first: the schema script recreates views that may use new columns.
     for table, column, definition in MIGRATIONS:
         columns = {r[1] for r in conn.execute(f"PRAGMA table_info({table})")}
-        if column not in columns:
+        if columns and column not in columns:  # no columns: the table is new and the schema creates it whole
             conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
+    conn.commit()
+    conn.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
     conn.commit()
 
 

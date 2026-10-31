@@ -106,6 +106,8 @@ export interface LivePoint {
   min_price: number | null;
   max_price: number | null;
   median: number | null;
+  /** What sellers really ask: the median listing, or the lowest one when there are fewer than 5. */
+  ask: number | null;
 }
 
 export type Granularity = 'day' | 'hour';
@@ -114,7 +116,10 @@ export interface History {
   /** null for items without ranks. */
   rank: number | null;
   granularity: Granularity;
+  /** Completed trades, without the days that look faked. */
   closed: ClosedPoint[];
+  /** Days left out of `closed` as likely faked trades (kept in the data, never counted in prices). */
+  excluded: ClosedPoint[];
   live: { sell: LivePoint[]; buy: LivePoint[] };
 }
 

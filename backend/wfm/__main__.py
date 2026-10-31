@@ -114,6 +114,18 @@ def _cmd_sync_images(_: argparse.Namespace) -> None:
         print(json.dumps(summary._asdict(), indent=2))
 
 
+def _cmd_check_prices(_: argparse.Namespace) -> None:
+    from .prices import flag_suspect
+
+    with session() as conn:
+        # Parts before sets (a set is checked against its parts); batches keep each write lock short.
+        ids = [r[0] for r in conn.execute(
+            """SELECT DISTINCT ps.item_id FROM price_stats ps JOIN items i ON i.id = ps.item_id
+               ORDER BY COALESCE(i.set_root, 0), ps.item_id""")]
+        flagged = sum(flag_suspect(conn, ids[i:i + 200]) for i in range(0, len(ids), 200))
+    print(f"{flagged} completed-trade rows flagged as likely faked, across {len(ids)} items with history.")
+
+
 def _forecast_summary(report: dict) -> str:
     week = report["horizons"][str(max(int(h) for h in report["horizons"]))]
     skill = week["overall"].get("skill")
@@ -162,6 +174,9 @@ def main() -> None:
 
     sub.add_parser("sync-images", help="download item images from the Warframe community database (resumable)") \
         .set_defaults(func=_cmd_sync_images)
+
+    sub.add_parser("check-prices", help="re-flag likely faked trades in all stored price history (offline)") \
+        .set_defaults(func=_cmd_check_prices)
 
     p = sub.add_parser("serve", help="run the dashboard API")
     p.add_argument("--host", default="127.0.0.1")

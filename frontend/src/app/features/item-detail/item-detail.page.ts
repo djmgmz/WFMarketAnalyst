@@ -4,7 +4,7 @@ import { NgTemplateOutlet } from '@angular/common';
 import { RouterLink } from '@angular/router';
 
 import { ApiService } from '../../core/api.service';
-import { formatCredits, formatDateTime, formatNumber, formatPlat, timeAgo, titleCase } from '../../core/format';
+import { formatCredits, formatDateTime, formatDay, formatNumber, formatPlat, timeAgo, titleCase } from '../../core/format';
 import { keepLast } from '../../core/keep-last';
 import { Granularity, LiveOrder } from '../../core/models';
 import { ColumnChartComponent } from '../../shared/charts/column-chart.component';
@@ -67,10 +67,13 @@ import { ItemThumbComponent } from '../../shared/item-thumb.component';
         <div class="grid charts" [class.refetching]="history.isLoading()">
           <section class="card">
             <div class="card-header">
-              <div><h2>Price</h2><p>Median completed trade vs median listed sell price, in platinum{{ forecastNote() }}.</p></div>
+              <div><h2>Price</h2><p>Median completed trade vs what sellers ask, in platinum{{ forecastNote() }}.</p></div>
             </div>
             @if (priceSeries().length) {
               <app-line-chart [series]="priceSeries()" [granularity]="granularity()" ariaLabel="Price history" />
+              @if (excludedNote(); as note) {
+                <p class="excluded-line muted">{{ note }}</p>
+              }
               @if (forecastSummary(); as f) {
                 <p class="forecast-line">
                   <span class="forecast-key" aria-hidden="true"></span>
@@ -186,6 +189,7 @@ import { ItemThumbComponent } from '../../shared/item-thumb.component';
     .item-link { display: inline-flex; align-items: center; gap: 8px; text-decoration: none; }
     .item-link:hover { text-decoration: underline; }
     .refetching { opacity: 0.6; transition: opacity 0.15s; }
+    .excluded-line { margin: 10px 0 0; font-size: 12.5px; }
     .forecast-line { margin: 10px 0 0; font-size: 13px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
     .forecast-key { width: 14px; border-top: 2px dashed var(--series-1); }
   `,
@@ -258,10 +262,10 @@ export class ItemDetailPage {
         points: h.closed.map((p) => ({ t: Date.parse(p.bucket), v: p.median })),
       });
     }
-    if (h.live.sell.length) {
+    if (h.live.sell.some((p) => p.ask !== null)) {  // every listing a joke: no listings line at all
       series.push({
-        key: 'listed', label: 'Median sell listing', color: 'var(--series-2)',
-        points: h.live.sell.map((p) => ({ t: Date.parse(p.bucket), v: p.median })),
+        key: 'listed', label: 'Sell listings', color: 'var(--series-2)',
+        points: h.live.sell.map((p) => ({ t: Date.parse(p.bucket), v: p.ask })),
       });
     }
     const forecasts = this.granularity() === 'day' ? this.forecast.value() ?? [] : [];
@@ -284,6 +288,19 @@ export class ItemDetailPage {
       }
     }
     return series;
+  });
+
+  /** Names the days left out as likely faked trades, so nothing disappears silently. */
+  protected readonly excludedNote = computed(() => {
+    const excluded = this.lastHistory()?.excluded ?? [];
+    if (!excluded.length) return null;
+    const exact = (n: number | null) => (n ?? 0).toLocaleString('en-US');  // 99,999, not 100K: the oddness is the point
+    const when = (bucket: string) => (this.granularity() === 'day' ? formatDay(Date.parse(bucket)) : formatDateTime(bucket));
+    const shown = excluded.slice(0, 3)
+      .map((p) => `${when(p.bucket)} (${exact(p.volume)} at ${exact(p.median)}p)`).join(', ');
+    const more = excluded.length > 3 ? ` and ${excluded.length - 3} more` : '';
+    const what = excluded.length === 1 ? 'one entry' : `${excluded.length} entries`;
+    return `Left out ${what} that look like faked trades: ${shown}${more}. They stay in the data but don't count toward prices or volume.`;
   });
 
   protected readonly volumePoints = computed(() =>

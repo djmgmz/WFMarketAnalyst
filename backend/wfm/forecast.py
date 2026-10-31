@@ -31,6 +31,10 @@ Behind the interface:
   only if it beats the naive baseline there on at least MIN_TEST_ROWS test rows.
   Otherwise forecasts for that segment come from the naive baseline, with a
   range from the segment's past moves. Every forecast records its method.
+* Clean, liquid data: suspect (likely faked) trade days are left out of the
+  dataset (prices.flag_suspect), and a series with fewer than LIQUID_MIN_DAYS
+  trading days in the last LIQUID_WINDOW_DAYS gets the baseline forecast too, so
+  thin markets never reach Predicted movers.
 """
 
 from __future__ import annotations
@@ -46,7 +50,7 @@ import pandas as pd
 
 from .db import utc_now
 from .jobs import NO_REPORT, Reporter
-from .prices import UNRANKED
+from .prices import LIQUID_MIN_DAYS, LIQUID_WINDOW_DAYS, UNRANKED, asking_price
 
 HORIZONS = (1, 7)
 TEST_DAYS = 14
@@ -186,21 +190,24 @@ def _frame(conn: sqlite3.Connection, sql: str, numeric: tuple[str, ...] = ()) ->
 
 
 def _dataset(conn: sqlite3.Connection) -> pd.DataFrame:
+    # Suspect (likely faked) trade days are left out: they count as days without trades.
     closed = _frame(conn, """SELECT item_id, mod_rank AS rank, bucket, median, volume, moving_avg, donch_top, donch_bot
-                             FROM price_stats WHERE source = 'closed' AND granularity = 'day'""",
+                             FROM price_stats WHERE source = 'closed' AND granularity = 'day' AND suspect = 0""",
                     numeric=("median", "volume", "moving_avg", "donch_top", "donch_bot"))
     if closed.empty:
         return pd.DataFrame()
     closed["date"] = pd.to_datetime(closed["bucket"].str[:10])
 
-    live = _frame(conn, """SELECT item_id, mod_rank AS rank, bucket, order_type, median, volume FROM price_stats
+    live = _frame(conn, """SELECT item_id, mod_rank AS rank, bucket, order_type, median, min_price, volume
+                           FROM price_stats
                            WHERE source = 'live' AND granularity = 'day' AND order_type IN ('sell', 'buy')""",
-                  numeric=("median", "volume"))
+                  numeric=("median", "min_price", "volume"))
     live_by_series: dict[tuple[str, int], pd.DataFrame] = {}
     if not live.empty:
         live["date"] = pd.to_datetime(live["bucket"].str[:10])
+        live["ask"] = [asking_price(m, low, v) for m, low, v in zip(live["median"], live["min_price"], live["volume"])]
         wide = live.pivot_table(index=["item_id", "rank", "date"], columns="order_type",
-                                values=["median", "volume"], aggfunc="last")
+                                values=["ask", "median", "volume"], aggfunc="last")
         wide.columns = [f"{value}_{side}" for value, side in wide.columns]
         live_by_series = {key: g.droplevel([0, 1]) for key, g in wide.groupby(level=[0, 1])}
 
@@ -262,8 +269,8 @@ def _series(g: pd.DataFrame, live: pd.DataFrame | None) -> pd.DataFrame:
     out["range_pos"] = ((price - s["donch_bot"].ffill()) / width.where(width > 0)).clip(-1, 2)
     out["ma_gap"] = logp - np.log(s["moving_avg"].ffill().where(lambda v: v > 0))
 
-    if "median_sell" in s:
-        sell = s["median_sell"].where(lambda v: v > 0)
+    if "ask_sell" in s:
+        sell = s["ask_sell"].where(lambda v: v > 0)  # prices.asking_price: the lowest listing when there are few
         out["listing_premium"] = np.log(sell) - logp
         out["spread"] = np.log(sell / s.get("median_buy", pd.Series(np.nan, index=days)).where(lambda v: v > 0))
         out["log_supply"] = np.log1p(s.get("volume_sell", pd.Series(np.nan, index=days)))
@@ -274,6 +281,8 @@ def _series(g: pd.DataFrame, live: pd.DataFrame | None) -> pd.DataFrame:
     out["level"] = np.log(median_28)
     out["band"] = pd.cut(median_28, bins=BAND_EDGES, labels=BAND_LABELS, right=False).astype(object)
     out["dow"] = days.day_of_week
+    # Genuine trading days in the window prices.liquid_series uses; thinner series get no model forecast.
+    out["trade_days"] = traded.astype(float).rolling(LIQUID_WINDOW_DAYS, min_periods=1).sum()
 
     for h in HORIZONS:
         # The average log price over the next h days vs today (h = 1: tomorrow's price). Averaging
@@ -393,7 +402,8 @@ def _evaluate(train_rows: pd.DataFrame, test_rows: pd.DataFrame, target: str, h:
 
 def _forecast(latest: pd.DataFrame, models: dict[str, lgb.LGBMRegressor] | None, uses_model: dict[str, dict[str, bool]],
               labelled: pd.DataFrame, target: str, h: int) -> list[dict[str, Any]]:
-    """One forecast per recent series: the model where its segments earned it, else the naive baseline."""
+    """One forecast per recent series: the model where its segments earned it and the series trades
+    often enough (prices.LIQUID_MIN_DAYS); otherwise the naive baseline."""
     if latest.empty:
         return []
     pred = _predict(models, latest) if models else None
@@ -401,7 +411,8 @@ def _forecast(latest: pd.DataFrame, models: dict[str, lgb.LGBMRegressor] | None,
     made_at = utc_now()
     rows = []
     for idx, r in latest.iterrows():
-        use = pred is not None and all(uses_model.get(seg, {}).get(str(r[seg]), False) for seg in SEGMENTS)
+        use = (pred is not None and r["trade_days"] >= LIQUID_MIN_DAYS
+               and all(uses_model.get(seg, {}).get(str(r[seg]), False) for seg in SEGMENTS))
         if use:
             low, point, high = pred.at[idx, "low"], pred.at[idx, "point"], pred.at[idx, "high"]
         else:

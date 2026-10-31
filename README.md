@@ -21,6 +21,8 @@ Predicting prices is hard, and it's easy to make a forecast look smarter than it
 
 The model learns from past prices, then gets tested on two recent weeks it never saw while learning, the same way it would face the real future. In testing it has been clearly better than "no change" at predicting next week's average price. For groups of items where it isn't better, the dashboard quietly falls back to "no change" and labels it that way. The Forecast page shows the current results, including where the model is and isn't trusted.
 
+Completed trades on warframe.market are self-reported, and some are faked (one item "sold" 199 times at 99,999p in a day). The dashboard spots days like that and leaves them out of prices, rankings and forecasts, saying on the item's page which days it left out. Items that rarely trade aren't ranked at all, because a single sale can move them.
+
 It's a demonstration, not trading advice. Game updates and in-game events can move prices in ways no chart can see coming.
 
 ## Data source and responsible use
