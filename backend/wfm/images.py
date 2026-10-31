@@ -8,7 +8,7 @@ Interface::
 
     sync_images(conn, source, images_dir, job=NO_REPORT)
                      match every catalog item to a community image and download the files it lacks;
-                     returns a summary. Resumable: files already on disk are not downloaded again.
+                     returns ImagesSynced. Resumable: files already on disk are not downloaded again.
     ImageSource      the seam: items() -> community item list, image(name) -> file bytes
     HttpImageSource  the real adapter (public WFCD API and image CDN), polite and identified
 
@@ -18,7 +18,8 @@ Behind the interface:
   lists the base relic, the community each refinement); a part blueprint's component (the market's
   `...HelmetBlueprint` is the community's `...HelmetComponent`); and finally the item's name, only
   when exactly one community item has it.
-* items.image is set only after its file is saved, so an interrupted run simply resumes.
+* items.image is exactly the matched file when it is on disk (NULL otherwise), so an interrupted
+  run simply resumes and a stale value never outlives the next run.
 """
 
 from __future__ import annotations
@@ -30,7 +31,7 @@ import re
 import sqlite3
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, NamedTuple, Protocol
 
 import httpx
 
@@ -106,50 +107,58 @@ def match_images(community: list[dict[str, Any]], catalog: list[tuple[str, str, 
     return {item_id: image for item_id, name, ref in catalog if (image := find(name, ref))}
 
 
+class ImagesSynced(NamedTuple):
+    items: int        # catalog items
+    matched: int      # items matched to a community image
+    files: int        # distinct files those items need (items often share one)
+    downloaded: int   # files fetched this run
+    already_had: int  # files already on disk
+    failed: int       # files that could not be fetched; the next run retries them
+
+
 async def sync_images(conn: sqlite3.Connection, source: ImageSource, images_dir: Path,
-                      job: Reporter = NO_REPORT) -> dict[str, int]:
+                      job: Reporter = NO_REPORT) -> ImagesSynced:
+    """Match the catalog to community images and download the files not yet on disk.
+
+    items.image ends up exactly "the matched file, if it is on disk": one transaction first
+    records the files already there and clears every other item (including stale values),
+    then each download is recorded as it lands, so the dashboard fills in while it runs.
+    """
     job.working_on("community item list")
     catalog = [tuple(r) for r in conn.execute("SELECT id, name, game_ref FROM items")]
     matched = match_images(await source.items(), catalog)
-
     items_by_file: defaultdict[str, list[str]] = defaultdict(list)
     for item_id, image in matched.items():
         items_by_file[image].append(item_id)
-    images_dir.mkdir(parents=True, exist_ok=True)
-    present = {name for name in items_by_file if (images_dir / name).is_file() and (images_dir / name).stat().st_size}
-    todo = sorted(set(items_by_file) - present)
 
+    images_dir.mkdir(parents=True, exist_ok=True)
+    present = {name for name in items_by_file if _saved(images_dir / name)}
+    await retry_locked(conn, lambda: _reconcile(conn, {i: f for i, f in matched.items() if f in present}))
     job.set_total(len(items_by_file))
     if present:
         job.note(skipped=len(present))
-        for name in present:
-            await retry_locked(conn, lambda: _record(conn, name, items_by_file[name]))
+        for _ in present:
             job.advance()
 
-    failed = 0
-    queue: asyncio.Queue[str] = asyncio.Queue()
-    for name in todo:
-        queue.put_nowait(name)
+    slots = asyncio.Semaphore(CONCURRENCY)
 
-    async def worker() -> None:
-        nonlocal failed
-        while not queue.empty():
-            name = queue.get_nowait()
+    async def fetch(name: str) -> bool:
+        async with slots:
             job.working_on(name)
             data = await _download(source, name)
-            if data is None:
-                failed += 1
-            else:
+            if data is not None:
                 part = images_dir / f".{name}.{os.getpid()}.part"  # never shared with another process
                 part.write_bytes(data)
                 part.replace(images_dir / name)
                 await retry_locked(conn, lambda: _record(conn, name, items_by_file[name]))
             job.advance(ok=data is not None)
             await asyncio.sleep(PAUSE_SECONDS)
+            return data is not None
 
-    await asyncio.gather(*(worker() for _ in range(CONCURRENCY)))
-    return {"items": len(catalog), "matched": len(matched), "files": len(items_by_file),
-            "downloaded": len(todo) - failed, "already_had": len(present), "failed": failed}
+    fetched = await asyncio.gather(*(fetch(name) for name in sorted(items_by_file.keys() - present)))
+    failed = fetched.count(False)
+    return ImagesSynced(items=len(catalog), matched=len(matched), files=len(items_by_file),
+                        downloaded=len(fetched) - failed, already_had=len(present), failed=failed)
 
 
 async def _download(source: ImageSource, name: str) -> bytes | None:
@@ -162,6 +171,17 @@ async def _download(source: ImageSource, name: str) -> bytes | None:
                 return None
             await asyncio.sleep(2 * (attempt + 1))
     return None  # pragma: no cover
+
+
+def _saved(path: Path) -> bool:
+    return path.is_file() and path.stat().st_size > 0
+
+
+def _reconcile(conn: sqlite3.Connection, images: dict[str, str]) -> None:
+    """Set items.image to exactly `images` ({item id: file}) in one transaction."""
+    conn.execute("UPDATE items SET image = NULL WHERE image IS NOT NULL")
+    conn.executemany("UPDATE items SET image = ? WHERE id = ?", [(f, i) for i, f in images.items()])
+    conn.commit()
 
 
 def _record(conn: sqlite3.Connection, name: str, item_ids: list[str]) -> None:

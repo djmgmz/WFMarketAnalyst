@@ -25,7 +25,10 @@ export class ItemThumbComponent {
   readonly name = input('');
   readonly size = input(28);
 
-  protected readonly src = computed(() => (this.image() ? `/api/images/${encodeURIComponent(this.image()!)}` : null));
+  protected readonly src = computed(() => {
+    const image = this.image();
+    return image ? `/api/images/${encodeURIComponent(image)}` : null;
+  });
   /** A broken image falls back to the letter; a new image gets a fresh try. */
   protected readonly failed = linkedSignal({ source: this.src, computation: () => false });
 }

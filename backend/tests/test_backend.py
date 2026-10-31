@@ -348,17 +348,20 @@ def test_sync_images_downloads_each_file_once_and_resumes(conn, tmp_path, monkey
     notes = Notes()
     summary = asyncio.run(images.sync_images(conn, first, folder, notes))
     assert sorted(first.downloads) == ["Energize.png", "QuickThinking.jpg", "blueprint.png"]  # the shared file once
-    assert summary == {"items": 4, "matched": 4, "files": 3, "downloaded": 2, "already_had": 0, "failed": 1}
+    assert summary._asdict() == {"items": 4, "matched": 4, "files": 3, "downloaded": 2, "already_had": 0, "failed": 1}
     stored = dict(conn.execute("SELECT id, image FROM items"))
     assert stored == {"a": "Energize.png", "b1": "blueprint.png", "b2": "blueprint.png", "q": None}  # failed: unset
     assert (folder / "blueprint.png").read_bytes() == b"bytes of blueprint.png" and not list(folder.glob(".*.part"))
     assert notes.done == 3
 
-    again = FakeImageSource(community)
+    # A stale value (the file was deleted) is cleared, and the missing files are fetched again.
+    (folder / "Energize.png").unlink()
+    again = FakeImageSource(community, broken={"Energize.png"})
     summary = asyncio.run(images.sync_images(conn, again, folder))
-    assert again.downloads == ["QuickThinking.jpg"]  # resumes: only the missing file
-    assert summary["already_had"] == 2 and summary["failed"] == 0
-    assert conn.execute("SELECT image FROM items WHERE id = 'q'").fetchone()[0] == "QuickThinking.jpg"
+    assert sorted(again.downloads) == ["Energize.png", "QuickThinking.jpg"]  # resumes: only missing files
+    assert (summary.already_had, summary.downloaded, summary.failed) == (1, 1, 1)
+    stored = dict(conn.execute("SELECT id, image FROM items"))
+    assert stored == {"a": None, "b1": "blueprint.png", "b2": "blueprint.png", "q": "QuickThinking.jpg"}
 
 
 def test_http_image_source_identifies_itself_and_follows_the_cdn_redirect():

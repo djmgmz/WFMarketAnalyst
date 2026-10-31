@@ -98,20 +98,20 @@ def _cmd_forecast(_: argparse.Namespace) -> None:
 
 
 def _cmd_sync_images(_: argparse.Namespace) -> None:
-    from .images import HttpImageSource, sync_images
+    from .images import HttpImageSource, ImagesSynced, sync_images
 
-    async def run(conn, job: Job) -> dict[str, int]:
+    async def run(conn, job: Job) -> ImagesSynced:
         async with HttpImageSource() as source:
             return await sync_images(conn, source, settings.images_dir, job)
 
     with session() as conn, Job.run("sync-images") as job:
         summary = asyncio.run(run(conn, job))
-        job.message = (f"{summary['matched']} of {summary['items']} items have an image; "
-                       f"{summary['downloaded']} files downloaded, {summary['failed']} failed")
+        job.message = (f"{summary.matched} of {summary.items} items have an image; "
+                       f"{summary.downloaded} files downloaded, {summary.failed} failed")
     if job.status == "stopped":
         print("Stopped. Images saved so far are kept; run sync-images again to resume.")
     else:
-        print(json.dumps(summary, indent=2))
+        print(json.dumps(summary._asdict(), indent=2))
 
 
 def _forecast_summary(report: dict) -> str:
