@@ -132,18 +132,33 @@ CREATE TABLE IF NOT EXISTS price_stats (
 CREATE INDEX IF NOT EXISTS idx_price_stats_lookup
     ON price_stats (item_id, source, granularity, mod_rank, bucket);
 
--- Latest daily median trade price of every item, at its default rank (rank 0, or
--- unranked = -1); see prices.default_rank. Dropped and recreated on every start
--- so a changed definition always takes effect.
+-- The views below are dropped and recreated on every start so a changed definition
+-- always takes effect. item_prices goes first: it reads default_subtypes.
 DROP VIEW IF EXISTS item_prices;
+
+-- The subtype a price refers to when none is given: the first of the item's catalog
+-- subtypes that its completed trades use (Intact for relics), or '' when they use none
+-- (some items list subtypes the statistics never split by); see prices.default_subtype.
+DROP VIEW IF EXISTS default_subtypes;
+CREATE VIEW default_subtypes AS
+SELECT i.id AS item_id,
+       COALESCE((SELECT s.value FROM json_each(i.subtypes) s
+                  WHERE EXISTS (SELECT 1 FROM price_stats ps
+                                 WHERE ps.item_id = i.id AND ps.source = 'closed'
+                                   AND ps.subtype = s.value)
+                  ORDER BY s.key LIMIT 1), '') AS subtype
+FROM items i;
+
+-- Latest daily median trade price of every item, at its default rank (rank 0, or
+-- unranked = -1; see prices.default_rank) and default subtype.
 CREATE VIEW item_prices AS
 SELECT i.id AS item_id,
        (SELECT ps.median FROM price_stats ps
          WHERE ps.item_id = i.id AND ps.source = 'closed' AND ps.granularity = 'day'
            AND ps.mod_rank = CASE WHEN i.max_rank IS NULL THEN -1 ELSE 0 END
-           AND ps.suspect = 0
+           AND ps.subtype = d.subtype AND ps.suspect = 0
          ORDER BY ps.bucket DESC LIMIT 1) AS price
-FROM items i;
+FROM items i JOIN default_subtypes d ON d.item_id = i.id;
 
 -- Periodic best-price snapshots from /v2/orders/item/{slug}/top for watchlist items.
 CREATE TABLE IF NOT EXISTS top_snapshots (

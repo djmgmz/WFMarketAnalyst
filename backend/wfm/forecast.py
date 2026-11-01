@@ -51,7 +51,7 @@ import pandas as pd
 
 from .db import utc_now
 from .jobs import NO_REPORT, Reporter
-from .prices import LIQUID_MIN_DAYS, LIQUID_WINDOW_DAYS, UNRANKED, asking_price
+from .prices import LIQUID_MIN_DAYS, LIQUID_WINDOW_DAYS, UNRANKED
 
 HORIZONS = (1, 7)
 TEST_DAYS = 14
@@ -196,24 +196,30 @@ def _frame(conn: sqlite3.Connection, sql: str, numeric: tuple[str, ...] = ()) ->
 
 
 def _dataset(conn: sqlite3.Connection) -> pd.DataFrame:
-    # Suspect (likely faked) trade days are left out: they count as days without trades.
-    closed = _frame(conn, """SELECT item_id, mod_rank AS rank, bucket, median, volume, moving_avg, donch_top, donch_bot
-                             FROM price_stats WHERE source = 'closed' AND granularity = 'day' AND suspect = 0""",
+    # Suspect (likely faked) trade days are left out: they count as days without trades. Only the
+    # default subtype is read, the one the item's latest price refers to.
+    closed = _frame(conn, """SELECT ps.item_id, ps.mod_rank AS rank, ps.bucket, ps.median, ps.volume,
+                                    ps.moving_avg, ps.donch_top, ps.donch_bot
+                             FROM price_stats ps
+                             JOIN default_subtypes d ON d.item_id = ps.item_id AND d.subtype = ps.subtype
+                             WHERE ps.source = 'closed' AND ps.granularity = 'day' AND ps.suspect = 0""",
                     numeric=("median", "volume", "moving_avg", "donch_top", "donch_bot"))
     if closed.empty:
         return pd.DataFrame()
     closed["date"] = pd.to_datetime(closed["bucket"].str[:10])
 
-    live = _frame(conn, """SELECT item_id, mod_rank AS rank, bucket, order_type, median, min_price, volume
-                           FROM price_stats
-                           WHERE source = 'live' AND granularity = 'day' AND order_type IN ('sell', 'buy')""",
+    live = _frame(conn, """SELECT ps.item_id, ps.mod_rank AS rank, ps.bucket, ps.order_type, ps.median,
+                                  ps.min_price, ps.volume
+                           FROM price_stats ps
+                           JOIN default_subtypes d ON d.item_id = ps.item_id AND d.subtype = ps.subtype
+                           WHERE ps.source = 'live' AND ps.granularity = 'day'
+                             AND ps.order_type IN ('sell', 'buy')""",
                   numeric=("median", "min_price", "volume"))
     live_by_series: dict[tuple[str, int], pd.DataFrame] = {}
     if not live.empty:
         live["date"] = pd.to_datetime(live["bucket"].str[:10])
-        live["ask"] = [asking_price(m, low, v) for m, low, v in zip(live["median"], live["min_price"], live["volume"])]
         wide = live.pivot_table(index=["item_id", "rank", "date"], columns="order_type",
-                                values=["ask", "median", "volume"], aggfunc="last")
+                                values=["min_price", "median", "volume"], aggfunc="last")
         wide.columns = [f"{value}_{side}" for value, side in wide.columns]
         live_by_series = {key: g.droplevel([0, 1]) for key, g in wide.groupby(level=[0, 1])}
 
@@ -275,9 +281,9 @@ def _series(g: pd.DataFrame, live: pd.DataFrame | None) -> pd.DataFrame:
     out["range_pos"] = ((price - s["donch_bot"].ffill()) / width.where(width > 0)).clip(-1, 2)
     out["ma_gap"] = logp - np.log(s["moving_avg"].ffill().where(lambda v: v > 0))
 
-    if "ask_sell" in s:
-        # prices.asking_price: the lowest listing when there are few
-        sell = s["ask_sell"].where(lambda v: v > 0)
+    if "min_price_sell" in s:
+        # The cheapest listing, the asking price the item chart shows (prices.history).
+        sell = s["min_price_sell"].where(lambda v: v > 0)
         out["listing_premium"] = np.log(sell) - logp
         out["spread"] = np.log(sell / s.get("median_buy", pd.Series(np.nan, index=days)).where(lambda v: v > 0))
         out["log_supply"] = np.log1p(s.get("volume_sell", pd.Series(np.nan, index=days)))

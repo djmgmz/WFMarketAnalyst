@@ -8,11 +8,12 @@ Interface::
                                            returns the count
     liquid_series(conn)                    (item id, stored rank) series with enough genuine
                                            trading to rank
-    asking_price(median, lowest, listings) what sellers really ask: the median, or the lowest
-                                           listing when there are few
     fetched_since(conn, since)             ids of items whose history was stored at or after `since`
     default_rank(max_rank)                 the rank a price refers to when none is given
-    history(conn, item, granularity, rank) completed-trade and listing series for one item
+    default_subtype(conn, item_id)         the subtype a price refers to when none is given
+    subtypes_with_history(conn, item)      subtypes with stored completed trades, in catalog order
+    history(conn, item, granularity, rank, subtype)
+                                           completed-trade and listing series for one item
     movers(conn, days, min_volume, limit)  biggest median price changes over `days`
     ducat_values(conn, limit)              prime parts ranked by ducats per platinum
 
@@ -21,9 +22,14 @@ instead of re-deriving it. Completed-trade rows flagged `suspect` are excluded
 everywhere prices are read (the view, history, movers, the forecast's dataset);
 the raw rows are kept.
 
+Prices are kept per subtype (a relic's Intact and Radiant trade far apart), and every
+reader stays on one: history on the one asked for, everything else (the view, movers,
+liquid series, the forecast's dataset) on the item's default subtype, read from the
+`default_subtypes` view.
+
 Behind the interface: the price_stats table and its conventions (unranked items
-stored as rank -1, live rows split by order type), which rank a price means, the
-suspect-trade rules, and the movers / ducat calculations.
+stored as rank -1, no subtype stored as '', live rows split by order type), which rank
+and subtype a price means, the suspect-trade rules, and the movers / ducat calculations.
 
 Suspect trades: completed trades are self-reported, so one player can "sell" 199 units at 99,999p. A
 day is judged against the same series' days within JUDGE_WINDOW_DAYS (each variant, such as a
@@ -66,7 +72,6 @@ JUDGE_WINDOW_DAYS = 21      # a day is judged against the same series' days this
 MIN_JUDGED_DAYS = 3         # other traded days within the window needed before a day can be judged
 LIQUID_WINDOW_DAYS = 28     # an item ranks (movers, predicted movers) only with genuine trading
 LIQUID_MIN_DAYS = 10        # on at least this many of the last LIQUID_WINDOW_DAYS days
-THIN_LISTINGS = 5           # below this many listings, the median listing means nothing
 
 # (item id, granularity, stored rank, subtype) of completed-trade rows
 Series = tuple[str, str, int, str]
@@ -82,6 +87,23 @@ def default_rank(max_rank: int | None) -> int | None:
 
 def _stored(rank: int | None) -> int:
     return UNRANKED if rank is None else rank
+
+
+def default_subtype(conn: sqlite3.Connection, item_id: str) -> str | None:
+    """The subtype prices refer to by default (Intact for relics), None for items without one.
+
+    Read from the `default_subtypes` view, which the other readers join.
+    """
+    row = conn.execute("SELECT subtype FROM default_subtypes WHERE item_id = ?", (item_id,)).fetchone()
+    return row[0] if row and row[0] else None
+
+
+def subtypes_with_history(conn: sqlite3.Connection, item: sqlite3.Row) -> list[str]:
+    """Subtypes with stored completed trades, in catalog order; empty for items without any."""
+    stored = {r[0] for r in conn.execute(
+        "SELECT DISTINCT subtype FROM price_stats WHERE item_id = ? AND source = 'closed' AND subtype <> ''",
+        (item["id"],))}
+    return [s for s in json.loads(item["subtypes"] or "[]") if s in stored]
 
 
 def store(conn: sqlite3.Connection, item_id: str, records: list[dict[str, Any]]) -> int:
@@ -198,8 +220,8 @@ def _parts_by_day(conn: sqlite3.Connection, parts: list[str]) -> dict[str, float
 def liquid_series(conn: sqlite3.Connection) -> set[tuple[str, int]]:
     """(item id, stored rank) series that trade often enough to rank in movers and forecasts.
 
-    That is genuine trades on at least LIQUID_MIN_DAYS of the last LIQUID_WINDOW_DAYS days;
-    thinner markets are too easy to move.
+    That is genuine trades, at the default subtype, on at least LIQUID_MIN_DAYS of the last
+    LIQUID_WINDOW_DAYS days; thinner markets are too easy to move.
     """
     latest = conn.execute(
         "SELECT MAX(bucket) FROM price_stats WHERE source = 'closed' AND granularity = 'day'").fetchone()[0]
@@ -207,17 +229,12 @@ def liquid_series(conn: sqlite3.Connection) -> set[tuple[str, int]]:
         return set()
     since = (parse_utc(latest) - timedelta(days=LIQUID_WINDOW_DAYS - 1)).strftime("%Y-%m-%dT%H:%M:%SZ")
     return {(r[0], r[1]) for r in conn.execute(
-        """SELECT item_id, mod_rank FROM price_stats
-           WHERE source = 'closed' AND granularity = 'day' AND suspect = 0 AND volume > 0 AND bucket >= ?
-           GROUP BY item_id, mod_rank HAVING COUNT(DISTINCT bucket) >= ?""", (since, LIQUID_MIN_DAYS))}
-
-
-def asking_price(median_price: float | None, lowest: float | None, listings: int | None) -> float | None:
-    """What sellers really ask: the median listing, or the lowest one when listings are thin.
-
-    Below THIN_LISTINGS listings, two or three joke listings make the median meaningless.
-    """
-    return median_price if (listings or 0) >= THIN_LISTINGS else lowest
+        """SELECT ps.item_id, ps.mod_rank FROM price_stats ps
+           JOIN default_subtypes d ON d.item_id = ps.item_id AND d.subtype = ps.subtype
+           WHERE ps.source = 'closed' AND ps.granularity = 'day' AND ps.suspect = 0 AND ps.volume > 0
+             AND ps.bucket >= ?
+           GROUP BY ps.item_id, ps.mod_rank HAVING COUNT(DISTINCT ps.bucket) >= ?""",
+        (since, LIQUID_MIN_DAYS))}
 
 
 def fetched_since(conn: sqlite3.Connection, since: str) -> set[str]:
@@ -225,40 +242,45 @@ def fetched_since(conn: sqlite3.Connection, since: str) -> set[str]:
 
 
 def history(conn: sqlite3.Connection, item: sqlite3.Row, granularity: Granularity,
-            rank: int | None = None) -> dict[str, Any]:
-    """Completed-trade series and sell/buy listing series at one rank (default: default_rank).
+            rank: int | None = None, subtype: str | None = None) -> dict[str, Any]:
+    """Completed-trade series and sell/buy listing series at one rank and subtype.
 
-    `closed` leaves out suspect days, which come back separately as `excluded`. Each listing
-    point carries `ask`, the asking_price, or None when it is more than SUSPECT_PRICE_RATIO
-    times what the item genuinely trades for (a listing nobody pays is not an asking price).
+    Rank and subtype default to default_rank and default_subtype. `closed` leaves out suspect
+    days, which come back separately as `excluded`. Each listing point carries `ask`, the
+    cheapest listing, or None when it is more than SUSPECT_PRICE_RATIO times what the item
+    genuinely trades for (a listing nobody pays is not an asking price). The cheapest listing,
+    not the median one: overpriced listings pile up unsold while trades happen at the cheap end,
+    so on a thin market the median listing can sit at twice what anything sells for.
     """
     rank = rank if rank is not None else default_rank(item["max_rank"])
-    args = (item["id"], granularity, _stored(rank))
+    subtype = subtype if subtype is not None else default_subtype(conn, item["id"])
+    args = (item["id"], granularity, _stored(rank), subtype or "")
     closed: list[dict[str, Any]] = []
     excluded: list[dict[str, Any]] = []
     for r in conn.execute(
         """SELECT bucket, volume, min_price, max_price, open_price, closed_price,
                   avg_price, wa_price, median, moving_avg, suspect
            FROM price_stats
-           WHERE item_id = ? AND source = 'closed' AND granularity = ? AND mod_rank = ?
+           WHERE item_id = ? AND source = 'closed' AND granularity = ? AND mod_rank = ? AND subtype = ?
            ORDER BY bucket""", args):
         (excluded if r["suspect"] else closed).append({k: r[k] for k in r.keys() if k != "suspect"})
     live: dict[str, list[dict[str, Any]]] = {"sell": [], "buy": []}
     for r in conn.execute(
         """SELECT bucket, order_type, volume, min_price, max_price, median
            FROM price_stats
-           WHERE item_id = ? AND source = 'live' AND granularity = ? AND mod_rank = ?
+           WHERE item_id = ? AND source = 'live' AND granularity = ? AND mod_rank = ? AND subtype = ?
              AND order_type IN ('sell', 'buy')
            ORDER BY bucket""", args):
         point = {k: r[k] for k in ("bucket", "volume", "min_price", "max_price", "median")}
-        live[r["order_type"]].append({**point, "ask": asking_price(r["median"], r["min_price"], r["volume"])})
+        live[r["order_type"]].append({**point, "ask": r["min_price"]})
     traded = [p["median"] for p in closed if (p["median"] or 0) > 0 and (p["volume"] or 0) > 0]
     if traded:
         ceiling = SUSPECT_PRICE_RATIO * median(traded)
         for point in live["sell"]:
             if point["ask"] is not None and point["ask"] > ceiling:
                 point["ask"] = None
-    return {"rank": rank, "granularity": granularity, "closed": closed, "excluded": excluded, "live": live}
+    return {"rank": rank, "subtype": subtype, "granularity": granularity,
+            "closed": closed, "excluded": excluded, "live": live}
 
 
 def ranks_with_history(conn: sqlite3.Connection, item_id: str) -> list[int | None]:
@@ -270,8 +292,8 @@ def movers(conn: sqlite3.Connection, *, days: int, min_volume: int, limit: int) 
     """Biggest daily-median changes between the newest recorded day and `days` before it.
 
     Only liquid (item, rank) series (liquid_series) that reach the newest day and traded at
-    least `min_volume` times in the window count; suspect days are ignored. Returns item ids;
-    callers add names.
+    least `min_volume` times in the window count; suspect days and subtypes other than the
+    default are ignored. Returns item ids; callers add names.
     """
     latest = conn.execute(
         "SELECT MAX(bucket) FROM price_stats WHERE source = 'closed' AND granularity = 'day'").fetchone()[0]
@@ -281,9 +303,10 @@ def movers(conn: sqlite3.Connection, *, days: int, min_volume: int, limit: int) 
     liquid = liquid_series(conn)
     series: dict[tuple[str, int], list[sqlite3.Row]] = defaultdict(list)
     for r in conn.execute(
-        """SELECT item_id, mod_rank, bucket, median, volume FROM price_stats
-           WHERE source = 'closed' AND granularity = 'day' AND suspect = 0 AND bucket >= ?
-           ORDER BY bucket""", (since,)):
+        """SELECT ps.item_id, ps.mod_rank, ps.bucket, ps.median, ps.volume FROM price_stats ps
+           JOIN default_subtypes d ON d.item_id = ps.item_id AND d.subtype = ps.subtype
+           WHERE ps.source = 'closed' AND ps.granularity = 'day' AND ps.suspect = 0 AND ps.bucket >= ?
+           ORDER BY ps.bucket""", (since,)):
         if (r["item_id"], r["mod_rank"]) in liquid:
             series[(r["item_id"], r["mod_rank"])].append(r)
     changes = []

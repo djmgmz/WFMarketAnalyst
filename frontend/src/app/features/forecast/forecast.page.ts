@@ -27,7 +27,7 @@ const FEATURE_LABELS: Record<string, string> = {
   vol_7: '7-day volatility', vol_14: '14-day volatility', vol_28: '28-day volatility',
   log_volume: 'Trades that day', volume_7: 'Trades, 7-day average', volume_28: 'Trades, 28-day average',
   range_pos: 'Position in recent price range', ma_gap: 'Price vs moving average',
-  listing_premium: 'Sell listings vs trade price', spread: 'Gap between buy and sell listings',
+  listing_premium: 'Cheapest listing vs trade price', spread: 'Gap between buy and sell listings',
   log_supply: 'Number of sell listings', level: 'Price level', days_since_trade: 'Days since last trade',
   dow: 'Day of week', rank: 'Rank', max_rank: 'Max rank', is_max_rank: 'Is max rank', ducats: 'Ducats',
   vaulted: 'Vaulted', req_mastery_rank: 'Mastery rank', category: 'Category', rarity: 'Rarity', band: 'Price band',

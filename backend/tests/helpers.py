@@ -48,8 +48,8 @@ STATS_PAYLOAD = {
     },
     "statistics_live": {
         "48hours": [],
-        "90days": [{"datetime": "2026-10-30T00:00:00.000+00:00", "volume": 50, "median": 130,
-                    "order_type": "sell", "mod_rank": 0}],
+        "90days": [{"datetime": "2026-10-30T00:00:00.000+00:00", "volume": 50, "min_price": 118,
+                    "median": 130, "order_type": "sell", "mod_rank": 0}],
     },
 }
 

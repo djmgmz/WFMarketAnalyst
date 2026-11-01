@@ -45,6 +45,10 @@ export interface ItemDetail extends ItemSummary {
   default_rank: number | null;
   /** Ranks with recorded price history (null = the item has no ranks). */
   historyRanks: (number | null)[];
+  /** Subtype prices refer to by default (e.g. a relic's "intact"), null for items without one. */
+  default_subtype: string | null;
+  /** Subtypes with recorded trades, in catalog order; each is its own market. */
+  historySubtypes: string[];
   recordedOrders: number;
 }
 
@@ -106,7 +110,7 @@ export interface LivePoint {
   min_price: number | null;
   max_price: number | null;
   median: number | null;
-  /** What sellers really ask: the median listing, or the lowest one when there are only a few. */
+  /** The cheapest listing; null when it is far above anything the item trades for. */
   ask: number | null;
 }
 
@@ -115,6 +119,8 @@ export type Granularity = 'day' | 'hour';
 export interface History {
   /** null for items without ranks. */
   rank: number | null;
+  /** null for items without subtypes. */
+  subtype: string | null;
   granularity: Granularity;
   /** Completed trades, without the days that look faked. */
   closed: ClosedPoint[];

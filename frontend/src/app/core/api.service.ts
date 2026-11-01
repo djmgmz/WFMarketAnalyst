@@ -45,15 +45,15 @@ export class ApiService {
     return this.http.get<ItemDetail>(`/api/items/${encodeURIComponent(slug)}`);
   }
 
-  history(slug: string, granularity: Granularity, rank: number | null): Observable<History> {
+  history(slug: string, granularity: Granularity, rank: number | null, subtype: string | null): Observable<History> {
     return this.http.get<History>(`/api/items/${encodeURIComponent(slug)}/history`, {
-      params: toParams({ granularity, rank: rank ?? undefined }),
+      params: toParams({ granularity, rank: rank ?? undefined, subtype: subtype ?? undefined }),
     });
   }
 
-  top(slug: string, rank: number | null): Observable<TopOrders> {
+  top(slug: string, rank: number | null, subtype: string | null): Observable<TopOrders> {
     return this.http.get<TopOrders>(`/api/items/${encodeURIComponent(slug)}/top`, {
-      params: toParams({ rank: rank ?? undefined }),
+      params: toParams({ rank: rank ?? undefined, subtype: subtype ?? undefined }),
     });
   }
 

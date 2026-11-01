@@ -7,7 +7,8 @@ Interface (the `Market` protocol)::
     await market.item(slug)                 one item with all detail fields
     await market.collection(kind)           riven/lich/sister/mission/npc/location records
     await market.price_history(slug)        90-day daily + 48-hour hourly statistics rows
-    await market.best_orders(slug, rank)    {"sell": [...], "buy": [...]} from online players
+    await market.best_orders(slug, rank, subtype)
+                                            {"sell": [...], "buy": [...]} from online players
     async for event in market.new_orders(stop):   Connection | NewOrder | OnlineCount, forever
 
 Records use the database's column names (see schema.sql), so callers store them
@@ -77,7 +78,8 @@ class Market(Protocol):
     async def item(self, slug: str) -> Record: ...
     async def collection(self, kind: str) -> list[Record]: ...
     async def price_history(self, slug: str) -> list[Record]: ...
-    async def best_orders(self, slug: str, rank: int | None = None) -> dict[str, list[Record]]: ...
+    async def best_orders(self, slug: str, rank: int | None = None,
+                          subtype: str | None = None) -> dict[str, list[Record]]: ...
     def new_orders(self, stop: asyncio.Event) -> AsyncIterator[MarketEvent]: ...
 
 
@@ -132,8 +134,10 @@ class HttpMarket:
             raise MarketError(str(exc)) from exc
         return _stat_records(body.get("payload") or {})
 
-    async def best_orders(self, slug: str, rank: int | None = None) -> dict[str, list[Record]]:
-        data = await self._data(f"/v2/orders/item/{slug}/top", None if rank is None else {"rank": rank})
+    async def best_orders(self, slug: str, rank: int | None = None,
+                          subtype: str | None = None) -> dict[str, list[Record]]:
+        params = {k: v for k, v in (("rank", rank), ("subtype", subtype)) if v is not None}
+        data = await self._data(f"/v2/orders/item/{slug}/top", params or None)
         return {"sell": data.get("sell") or [], "buy": data.get("buy") or []}
 
     async def new_orders(self, stop: asyncio.Event) -> AsyncIterator[MarketEvent]:

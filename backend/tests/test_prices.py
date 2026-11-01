@@ -1,4 +1,4 @@
-"""Price history: default rank, latest price, suspect trades, liquidity and asking prices."""
+"""Price history: default rank and subtype, latest price, suspect trades, liquidity, asks."""
 
 from __future__ import annotations
 
@@ -139,23 +139,53 @@ def test_only_items_with_enough_genuine_trading_days_are_liquid(conn):
     assert prices.liquid_series(conn) == {("liquid", prices.UNRANKED)}
 
 
-def test_history_drops_asking_prices_nobody_pays(conn):
-    _item(conn, "thin")
-    listing = lambda day, count, low, mid: {"source": "live", "granularity": "day", "mod_rank": None, "subtype": "",
-                                            "order_type": "sell", "bucket": f"2026-09-{day:02d}T00:00:00Z",
-                                            "volume": count, "min_price": low, "median": mid}
-    prices.store(conn, "thin", [_day(d, 100, 1) for d in range(1, 6)])
-    prices.store(conn, "thin", [listing(1, 1, 80000, 80000), listing(2, 3, 120, 4500), listing(3, 8, 90, 110)])
-    hist = prices.history(conn, conn.execute("SELECT * FROM items WHERE id = 'thin'").fetchone(), "day")
-    # Junk, the lowest of 3, the median of 8.
-    assert [p["ask"] for p in hist["live"]["sell"]] == [None, 120, 110]
+def _listing(day: int, low: float, mid: float, subtype: str = "") -> dict:
+    return {"source": "live", "granularity": "day", "mod_rank": None, "subtype": subtype, "order_type": "sell",
+            "bucket": f"2026-09-{day:02d}T00:00:00Z", "volume": 20, "min_price": low, "median": mid}
 
 
-def test_asking_price_uses_the_lowest_listing_when_there_are_few():
-    # Four listings, one at 80,000p: the median means nothing.
-    assert prices.asking_price(4500, 1000, 4) == 1000
-    assert prices.asking_price(130, 110, 50) == 130
-    assert prices.asking_price(None, None, None) is None
+def test_the_asking_price_is_the_cheapest_listing_unless_nobody_pays_it(conn):
+    # Arcane Chorus Helmet: trades at 350p, listings from 350p to 2,000p with a median near 800p.
+    _item(conn, "helmet")
+    prices.store(conn, "helmet", [_day(d, 350, 1) for d in range(1, 6)])
+    prices.store(conn, "helmet", [_listing(1, 80000, 80000), _listing(2, 350, 800), _listing(3, 300, 850)])
+    hist = prices.history(conn, conn.execute("SELECT * FROM items WHERE id = 'helmet'").fetchone(), "day")
+    assert [p["ask"] for p in hist["live"]["sell"]] == [None, 350, 300]
+
+
+def test_each_subtype_is_its_own_market(client, conn):
+    # A relic's Radiant trades and lists far above its Intact; every reader keeps them apart.
+    _item(conn, "relic", subtypes=json.dumps(["intact", "exceptional", "flawless", "radiant"]))
+    intact = [{**_day(d, 5, 30, month=10), "subtype": "intact"} for d in range(1, 13)]
+    radiant = [{**_day(d, 50 + d, 3, month=10), "subtype": "radiant"} for d in range(1, 13)]
+    prices.store(conn, "relic", intact + radiant)
+    prices.store(conn, "relic", [_listing(1, 6, 7, "intact"), _listing(1, 98, 98, "radiant")])
+    item = conn.execute("SELECT * FROM items WHERE id = 'relic'").fetchone()
+
+    assert prices.default_subtype(conn, "relic") == "intact"
+    assert prices.subtypes_with_history(conn, item) == ["intact", "radiant"]
+    assert conn.execute("SELECT price FROM item_prices WHERE item_id = 'relic'").fetchone()[0] == 5
+    default = prices.history(conn, item, "day")
+    assert default["subtype"] == "intact" and {p["median"] for p in default["closed"]} == {5}
+    assert [p["ask"] for p in default["live"]["sell"]] == [6]
+    radiant_hist = prices.history(conn, item, "day", subtype="radiant")
+    assert [p["ask"] for p in radiant_hist["live"]["sell"]] == [98]
+    # Radiant rose every day, but movers read the flat Intact series only.
+    assert prices.movers(conn, days=7, min_volume=1, limit=5) == {"gainers": [], "losers": []}
+
+    body = client.get("/api/items/relic").json()
+    assert (body["default_subtype"], body["historySubtypes"]) == ("intact", ["intact", "radiant"])
+    assert client.get("/api/items/relic/history", params={"subtype": "radiant"}).json()["closed"][0]["median"] == 51
+
+
+def test_items_whose_statistics_never_split_by_subtype_have_none(conn):
+    # Some mods list subtypes the statistics never use; their prices stay readable.
+    _item(conn, "mod", subtypes=json.dumps(["regular", "atragraph"]))
+    prices.store(conn, "mod", [_day(1, 12, 3)])
+    item = conn.execute("SELECT * FROM items WHERE id = 'mod'").fetchone()
+    assert prices.default_subtype(conn, "mod") is None and prices.subtypes_with_history(conn, item) == []
+    assert conn.execute("SELECT price FROM item_prices WHERE item_id = 'mod'").fetchone()[0] == 12
+    assert [p["median"] for p in prices.history(conn, item, "day")["closed"]] == [12]
 
 
 def test_backfill_flags_suspect_days_as_it_stores(client, conn, tmp_path):

@@ -64,12 +64,19 @@ import { ItemThumbComponent } from '../../shared/item-thumb.component';
               <button type="button" [attr.aria-pressed]="rank() === it.max_rank" (click)="rank.set(it.max_rank)">Max rank ({{ it.max_rank }})</button>
             </div>
           }
+          @if (it.historySubtypes.length > 1) {
+            <div class="segmented" role="group" aria-label="Subtype">
+              @for (s of it.historySubtypes; track s) {
+                <button type="button" [attr.aria-pressed]="subtype() === s" (click)="subtype.set(s)">{{ subtypeLabel(s) }}</button>
+              }
+            </div>
+          }
         </div>
 
         <div class="grid charts" [class.refetching]="history.isLoading()">
           <section class="card">
             <div class="card-header">
-              <div><h2>Price</h2><p>Median completed trade vs what sellers ask, in platinum{{ forecastNote() }}.</p></div>
+              <div><h2>Price</h2><p>Median completed trade vs the cheapest sell listing, in platinum{{ forecastNote() }}.</p></div>
             </div>
             @if (priceSeries().length) {
               <app-line-chart [series]="priceSeries()" [granularity]="granularity()" ariaLabel="Price history" />
@@ -208,14 +215,16 @@ export class ItemDetailPage {
   protected readonly item = rxResource({ params: () => this.slug(), stream: ({ params }) => this.api.item(params) });
   /** Selected rank; resets to the backend's default rank whenever the item changes. */
   protected readonly rank = linkedSignal<number | null>(() => this.item.value()?.default_rank ?? null);
+  /** Selected subtype (a relic's refinement, a fish's size); resets like the rank. */
+  protected readonly subtype = linkedSignal<string | null>(() => this.item.value()?.default_subtype ?? null);
 
   protected readonly history = rxResource({
-    params: () => ({ slug: this.slug(), granularity: this.granularity(), rank: this.rank() }),
-    stream: ({ params }) => this.api.history(params.slug, params.granularity, params.rank),
+    params: () => ({ slug: this.slug(), granularity: this.granularity(), rank: this.rank(), subtype: this.subtype() }),
+    stream: ({ params }) => this.api.history(params.slug, params.granularity, params.rank, params.subtype),
   });
   protected readonly top = rxResource({
-    params: () => ({ slug: this.slug(), rank: this.rank() }),
-    stream: ({ params }) => this.api.top(params.slug, params.rank),
+    params: () => ({ slug: this.slug(), rank: this.rank(), subtype: this.subtype() }),
+    stream: ({ params }) => this.api.top(params.slug, params.rank, params.subtype),
   });
 
   protected readonly forecast = rxResource({
@@ -225,10 +234,14 @@ export class ItemDetailPage {
 
   private readonly lastHistory = keepLast(this.history.value);
 
-  /** The 7-day forecast (the average price over the next 7 days), shown on the daily chart only. */
-  protected readonly forecastSummary = computed(() =>
-    this.granularity() === 'day' ? (this.forecast.value() ?? []).find((f) => f.horizon === 7) ?? null : null,
-  );
+  /** Forecasts on the daily chart, which are of the default subtype only. */
+  private readonly shownForecasts = computed(() => {
+    const defaultSubtype = this.item.value()?.default_subtype ?? null;
+    return this.granularity() === 'day' && this.subtype() === defaultSubtype ? this.forecast.value() ?? [] : [];
+  });
+
+  /** The 7-day forecast (the average price over the next 7 days). */
+  protected readonly forecastSummary = computed(() => this.shownForecasts().find((f) => f.horizon === 7) ?? null);
 
   protected readonly forecastNote = computed(() => (this.forecastSummary() ? ', with the forecast (dashed)' : ''));
 
@@ -243,7 +256,10 @@ export class ItemDetailPage {
     const it = this.item.value();
     if (!it) return [];
     const facts = [
-      { label: 'Latest median price', value: formatPlat(it.price) },
+      {
+        label: it.default_subtype ? `Latest median price (${this.subtypeLabel(it.default_subtype)})` : 'Latest median price',
+        value: formatPlat(it.price),
+      },
       { label: 'Ducats', value: formatNumber(it.ducats) },
       { label: 'Trading tax', value: formatCredits(it.trading_tax) },
       { label: 'Mastery rank', value: formatNumber(it.req_mastery_rank) },
@@ -269,11 +285,11 @@ export class ItemDetailPage {
     // When every listing is a joke there is no listings line at all.
     if (h.live.sell.some((p) => p.ask !== null)) {
       series.push({
-        key: 'listed', label: 'Sell listings', color: 'var(--series-2)',
+        key: 'listed', label: 'Cheapest listing', color: 'var(--series-2)',
         points: h.live.sell.map((p) => ({ t: Date.parse(p.bucket), v: p.ask })),
       });
     }
-    const forecasts = this.granularity() === 'day' ? this.forecast.value() ?? [] : [];
+    const forecasts = this.shownForecasts();
     if (forecasts.length) {
       // Forecasts continue the trade-price line: same color, dashed, with their likely range.
       // Tomorrow's price is a point on day 1; a longer horizon is an average over days 1..h, so it
@@ -313,6 +329,10 @@ export class ItemDetailPage {
   protected readonly volumePoints = computed(() =>
     (this.lastHistory()?.closed ?? []).map((p) => ({ t: Date.parse(p.bucket), v: p.volume })),
   );
+
+  protected subtypeLabel(subtype: string): string {
+    return subtype.charAt(0).toUpperCase() + subtype.slice(1);
+  }
 
   protected watch(): void {
     this.api.watch(this.slug(), null).subscribe(() => this.item.reload());

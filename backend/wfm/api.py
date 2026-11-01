@@ -21,7 +21,7 @@ from .market import HttpMarket, MarketError
 from .config import settings
 from .db import connect, get_meta, init_db, utc_now
 
-_top_cache: dict[tuple[str, int | None], tuple[float, Any]] = {}
+_top_cache: dict[tuple[str, int | None, str | None], tuple[float, Any]] = {}
 
 
 @asynccontextmanager
@@ -261,7 +261,7 @@ def list_items(
 
 @app.get("/api/items/{slug}")
 def get_item(slug: str, conn: sqlite3.Connection = Db) -> dict[str, Any]:
-    _item_or_404(conn, slug)
+    stored = _item_or_404(conn, slug)
     item = _row(conn.execute(f"SELECT i.*, p.price FROM items i {PRICED} WHERE i.slug = ?", (slug,)).fetchone())
     set_items: list[dict[str, Any]] = []
     if item.get("set_parts"):
@@ -277,6 +277,8 @@ def get_item(slug: str, conn: sqlite3.Connection = Db) -> dict[str, Any]:
         **item,
         "default_rank": prices.default_rank(item["max_rank"]),
         "historyRanks": prices.ranks_with_history(conn, item["id"]),
+        "default_subtype": prices.default_subtype(conn, item["id"]),
+        "historySubtypes": prices.subtypes_with_history(conn, stored),
         "setItems": set_items,
         "watch": dict(watch) if watch else None,
         "recordedOrders": conn.execute(
@@ -290,8 +292,9 @@ def item_history(
     conn: sqlite3.Connection = Db,
     granularity: Literal["day", "hour"] = "day",
     rank: int | None = None,
+    subtype: str | None = None,
 ) -> dict[str, Any]:
-    return prices.history(conn, _item_or_404(conn, slug), granularity, rank)
+    return prices.history(conn, _item_or_404(conn, slug), granularity, rank, subtype)
 
 
 @app.get("/api/items/{slug}/orders")
@@ -302,15 +305,21 @@ def item_orders(slug: str, conn: sqlite3.Connection = Db, limit: int = Query(50,
 
 
 @app.get("/api/items/{slug}/top")
-async def item_top(slug: str, conn: sqlite3.Connection = Db, rank: int | None = None) -> dict[str, Any]:
-    """Live best buy/sell orders, proxied with a short cache. Not stored."""
-    _item_or_404(conn, slug)
-    key = (slug, rank)
+async def item_top(slug: str, conn: sqlite3.Connection = Db, rank: int | None = None,
+                   subtype: str | None = None) -> dict[str, Any]:
+    """Live best buy/sell orders, proxied with a short cache. Not stored.
+
+    Subtype defaults to the item's default subtype: a relic's Intact and Radiant orders are
+    different markets.
+    """
+    item = _item_or_404(conn, slug)
+    subtype = subtype if subtype is not None else prices.default_subtype(conn, item["id"])
+    key = (slug, rank, subtype)
     cached = _top_cache.get(key)
     if cached and time.monotonic() - cached[0] < settings.top_cache_seconds:
         return cached[1]
     try:
-        data = await app.state.market.best_orders(slug, rank)
+        data = await app.state.market.best_orders(slug, rank, subtype)
     except MarketError as exc:
         raise HTTPException(502, f"warframe.market: {exc}") from exc
     result = {"fetchedAt": utc_now(), **data}

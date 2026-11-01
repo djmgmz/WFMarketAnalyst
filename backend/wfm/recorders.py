@@ -134,9 +134,11 @@ async def snapshot_watchlist(conn: sqlite3.Connection, market: Market) -> int:
     taken_at = utc_now()
     count = 0
     for row in rows:
+        # Snapshots are of the default subtype, the one the item's price refers to.
+        subtype = prices.default_subtype(conn, row["id"])
         for rank in [None] if row["max_rank"] is None else [0, row["max_rank"]]:
             try:
-                s = top_summary(await market.best_orders(row["slug"], rank))
+                s = top_summary(await market.best_orders(row["slug"], rank, subtype))
             except MarketError as exc:
                 log.warning("Top orders failed for %s: %s", row["slug"], exc)
                 continue
