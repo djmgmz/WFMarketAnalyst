@@ -10,6 +10,10 @@ const PATHS = {
   running: 'M10 4.5 15.5 10 10 15.5 4.5 10z',
   warning: 'M10 3 18 17H2zM10 8v4M10 14.2v.1',
   check: 'M4 10.5l4 4 8-9',
+  stopped: 'M6 6h8v8H6z',
+  failed: 'M5 5l10 10M15 5 5 15',
+  back: 'M16 10H4M9 5l-5 5 5 5',
+  external: 'M8 4H4v12h12v-4M11 3h6v6M17 3l-8 8',
 } as const;
 
 export type IconName = keyof typeof PATHS;
@@ -23,7 +27,8 @@ export type IconName = keyof typeof PATHS;
       <path [attr.d]="d()" />
     </svg>
   `,
-  styles: `:host { display: inline-flex; flex: none; } svg { display: block; }`,
+  // Add class "filled" to fill closed shapes (a watched star).
+  styles: `:host { display: inline-flex; flex: none; } svg { display: block; } :host(.filled) path { fill: currentColor; }`,
 })
 export class IconComponent {
   readonly name = input.required<IconName>();

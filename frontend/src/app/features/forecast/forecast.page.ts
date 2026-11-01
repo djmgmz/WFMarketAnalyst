@@ -11,6 +11,7 @@ import { RankedBarsComponent, RankedRow } from '../../shared/charts/ranked-bars.
 import { EmptyStateComponent } from '../../shared/empty-state.component';
 import { IconComponent } from '../../shared/icon.component';
 import { ItemThumbComponent } from '../../shared/item-thumb.component';
+import { LoadingComponent } from '../../shared/loading.component';
 import { StatTileComponent } from '../../shared/stat-tile.component';
 
 const RANKINGS: { value: MoverRanking; label: string; note: string }[] = [
@@ -37,7 +38,7 @@ const SEGMENT_LABELS: Record<string, string> = { category: 'Category', band: 'Pr
 @Component({
   selector: 'app-forecast-page',
   imports: [NgTemplateOutlet, RouterLink, StatTileComponent, RankedBarsComponent, EmptyStateComponent, ItemThumbComponent,
-            IconComponent],
+            IconComponent, LoadingComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="page">
@@ -95,7 +96,9 @@ const SEGMENT_LABELS: Record<string, string> = { category: 'Category', band: 'Pr
               </div>
               @if (risingRows().length) {
                 <ng-container *ngTemplateOutlet="forecastTable; context: { $implicit: risingRows(), method: false }" />
-              } @else if (!rising.isLoading()) {
+              } @else if (rising.isLoading()) {
+                <app-loading [rows]="6" />
+              } @else {
                 <app-empty-state title="No rises predicted">
                   The model predicts no rise of 1p or more for {{ over() }}, or it isn't used for any group of items yet.
                 </app-empty-state>
@@ -146,7 +149,7 @@ const SEGMENT_LABELS: Record<string, string> = { category: 'Category', band: 'Pr
                       <td class="r" [class.delta-up]="(row.m.skill ?? 0) > 0" [class.delta-down]="(row.m.skill ?? 0) < 0">{{ pct(row.m.skill) }}</td>
                       <td class="r">{{ pct(row.m.trend_skill) }}</td>
                       <td class="r">{{ share(row.m.coverage) }}</td>
-                      <td>@if (row.m.uses_model) { <span class="chip model">✓ Model</span> } @else { <span class="chip">Baseline</span> }</td>
+                      <td>@if (row.m.uses_model) { <span class="chip model">Model</span> } @else { <span class="chip">Baseline</span> }</td>
                     </tr>
                   }
                 </tbody>
@@ -155,7 +158,7 @@ const SEGMENT_LABELS: Record<string, string> = { category: 'Category', band: 'Pr
           </section>
         }
 
-        <div class="grid grid-2">
+        <div class="grid method">
           <section class="card">
             <div class="card-header"><div><h2>What the model relies on</h2>
               <p>Share of the 7-day model's decisions driven by each input.</p></div></div>
@@ -188,7 +191,9 @@ const SEGMENT_LABELS: Record<string, string> = { category: 'Category', band: 'Pr
             </ul>
           </section>
         </div>
-      } @else if (!reportRes.isLoading()) {
+      } @else if (reportRes.isLoading()) {
+        <app-loading [rows]="5" />
+      } @else {
         <app-empty-state title="The forecast hasn't been trained yet">
           Backfill some price history first (Overview → Background jobs → Price history backfill), then start
           <strong>Price forecast</strong> there, or run <code>python -m wfm forecast</code>.
@@ -213,7 +218,7 @@ const SEGMENT_LABELS: Record<string, string> = { category: 'Category', band: 'Pr
                 <td class="r nowrap">{{ gainText(f.gain) }}</td>
                 <td class="r nowrap" [class.delta-up]="f.change > 0" [class.delta-down]="f.change < 0">
                   @if (f.change === 0) { <span class="muted">no change</span> }
-                  @else { {{ f.change > 0 ? '▲' : '▼' }} {{ pct(f.change) }} }</td>
+                  @else { {{ pct(f.change) }} }</td>
                 @if (method) {
                   <td>@if (f.method === 'model') { <span class="chip model">Model</span> } @else { <span class="chip">Baseline</span> }</td>
                 }
@@ -228,10 +233,11 @@ const SEGMENT_LABELS: Record<string, string> = { category: 'Category', band: 'Pr
     .verdict-title { display: flex; align-items: center; gap: 8px; font-family: var(--font-display); font-size: 18px;
                      font-weight: 600; letter-spacing: 0.01em; }
     .verdict-title app-icon { color: var(--status-warning); }
-    .verdict.good { border-color: rgba(76, 195, 138, 0.35); }
     .verdict.good .verdict-title app-icon { color: var(--status-good); }
     .verdict p { margin: 6px 0 0; }
     .chip.model { color: var(--delta-up); border-color: currentColor; }
+    .method { grid-template-columns: minmax(0, 1fr); }
+    @media (min-width: 1100px) { .method { grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); } }
     .prose ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
     .prose h3 { font-size: 13px; margin: 14px 0 6px; }
     .filter-row { margin-bottom: 12px; }
@@ -329,7 +335,7 @@ export class ForecastPage {
   });
 
   protected readonly featureRows = computed<RankedRow[]>(() =>
-    (this.report()?.feature_importance ?? []).slice(0, 10)
+    (this.report()?.feature_importance ?? []).slice(0, 15)
       .map((f) => ({ key: f.feature, label: FEATURE_LABELS[f.feature] ?? f.feature, value: f.share })),
   );
 

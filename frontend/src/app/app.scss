@@ -63,7 +63,6 @@ nav {
   align-items: center;
   gap: 10px;
   padding: 8px 10px;
-  border: 1px solid transparent;
   border-radius: var(--r-control);
   corner-shape: var(--corner);
   color: var(--text-secondary);
@@ -79,15 +78,18 @@ nav {
     color: var(--text-primary);
   }
 
-  // The current place is the one accent-coloured thing in the rail.
+  // The current place: ink and weight, with an accent hairline exactly as wide as its name.
   &.active {
-    border-color: var(--accent-line);
-    background: var(--accent-wash);
     color: var(--text-primary);
     font-weight: 600;
 
     .nav-icon {
-      color: var(--accent);
+      color: var(--text-primary);
+    }
+
+    .nav-label {
+      text-decoration: underline 1px var(--accent);
+      text-underline-offset: 7px;
     }
   }
 }
@@ -158,9 +160,11 @@ nav {
   min-width: 0;
 }
 
+// Phone: the rail folds into a top bar, with the nav as a row of equal tabs (icon over label).
 @media (max-width: 860px) {
+  // minmax(0, ...): a plain 1fr grows to the nav row's full width and pushes the page off screen.
   .shell {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .sidebar {
@@ -169,10 +173,42 @@ nav {
     flex-direction: row;
     flex-wrap: wrap;
     align-items: center;
+    gap: 10px 16px;
+    padding: 12px 16px 0;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .brand-sub {
+    display: none;
+  }
+
+  .job-pills {
+    flex-direction: row;
+    margin-left: auto;
   }
 
   nav {
-    flex-direction: row;
+    order: 3;
+    flex: 1 0 100%;
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    gap: 0;
+    padding-bottom: 6px;
+  }
+
+  .nav-link {
+    flex-direction: column;
+    gap: 3px;
+    padding: 6px 0;
+    font-size: 12.5px;
+    text-align: center;
+
+  }
+
+  .nav-link.active .nav-label {
+    text-underline-offset: 5px;
   }
 
   .sidebar-foot {

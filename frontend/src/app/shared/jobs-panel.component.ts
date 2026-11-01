@@ -7,10 +7,12 @@ import { ApiService } from '../core/api.service';
 import { STATE_LABELS, describe, progressFraction } from '../core/job-format';
 import { JobsService } from '../core/jobs.service';
 import { Job, JobName, JobStartOptions } from '../core/models';
+import { IconComponent } from './icon.component';
 
 /** Live status of every job, with Start / Stop controls. Driven entirely by the job definitions. */
 @Component({
   selector: 'app-jobs-panel',
+  imports: [IconComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="jobs">
@@ -20,7 +22,7 @@ import { Job, JobName, JobStartOptions } from '../core/models';
             <span class="title">{{ card.job.title }}</span>
             @if (card.job.run; as run) {
               <span class="state" [attr.data-state]="run.state">
-                <span class="icon" aria-hidden="true">{{ states[run.state].icon }}</span>{{ states[run.state].label }}
+                <app-icon class="icon" [name]="states[run.state].icon" [size]="13" />{{ states[run.state].label }}
               </span>
             } @else {
               <span class="state muted">Not run yet</span>
@@ -60,7 +62,7 @@ import { Job, JobName, JobStartOptions } from '../core/models';
                     }
                   </select>
                 }
-                <button class="btn small primary" type="button" (click)="start(card.job)" [disabled]="busy() === card.job.name">
+                <button class="btn small" type="button" (click)="start(card.job)" [disabled]="busy() === card.job.name">
                   {{ busy() === card.job.name ? 'Starting…' : card.startLabel }}</button>
                 @if (card.job.resumable) { <span class="hint">Picks up where it stopped</span> }
               }
@@ -78,7 +80,6 @@ import { Job, JobName, JobStartOptions } from '../core/models';
     header { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; }
     .title { font-family: var(--font-display); font-size: 15px; font-weight: 600; }
     .state { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; color: var(--text-secondary); }
-    .state .icon { font-size: 11px; }
     .state[data-state='running'] .icon { color: var(--accent); }
     .state[data-state='finished'] .icon { color: var(--status-good); }
     .state[data-state='stalled'] .icon { color: var(--status-warning); }

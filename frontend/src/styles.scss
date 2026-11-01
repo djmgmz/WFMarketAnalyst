@@ -15,22 +15,19 @@
   --text-muted: #80888b;
   --grid: #232d31;
   --axis: #34444a;
-  --border: rgba(197, 199, 200, 0.1);
+  --border: #2c3539; // opaque hairline: 1.35:1 on panels, 1.46:1 on the page
   --hover-wash: rgba(65, 143, 165, 0.08);
   --series-1: #35a3ba; // completed trades: the site's logo cyan, stepped into the chart band
-  --series-2: #b43e8b; // sell listings: the site's "Want to Sell" magenta, deepened for colour-blind separation
-  --series-1-wash: rgba(53, 163, 186, 0.12);
-  --seq-250: #1f4f5c;
+  // Sell listings: the site's "Want to Sell" magenta, deepened for colour-blind separation.
+  --series-2: #b43e8b;
   --accent: #418fa5; // the site's interactive teal
-  --accent-hover: #4d9db3;
   --accent-line: rgba(65, 143, 165, 0.55);
   --accent-wash: rgba(65, 143, 165, 0.14);
-  --on-accent: #071013;
   --meter-track: #21404a; // the site's dark teal button
   --delta-up: #1bb194; // the site's green
   --status-good: #1bb194;
   --status-warning: #f0b43c;
-  --status-critical: #e5683a; // the site's place-order orange, lightened for text
+  --status-critical: #e5566f; // falls and failures: a cool rose, 4.7:1 on panels
   --focus: var(--accent);
   --font: system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-display: "Chakra Petch", var(--font);
@@ -101,7 +98,7 @@ h3 {
 
 // Page titles read like the game's screen titles.
 h1 {
-  font-size: 26px;
+  font-size: 24px;
   line-height: 1.15;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -164,6 +161,31 @@ code {
   max-width: 1320px;
 }
 
+@media (max-width: 600px) {
+  .hide-phone {
+    display: none;
+  }
+
+  h1 {
+    font-size: 21px;
+  }
+}
+
+@media (max-width: 860px) {
+  .page {
+    padding: 20px 16px 40px;
+  }
+
+  .page-header {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  .input {
+    min-width: 0;
+  }
+}
+
 .page-header {
   display: flex;
   align-items: flex-end;
@@ -182,13 +204,21 @@ code {
 }
 
 .grid-2 {
-  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr));
+  align-items: start;
 }
 
+// Key figures: one panel divided by hairlines, not a row of separate cards. Each tile borders its
+// left and top edge and is pulled 1px out over them; the panel clips the ones on its outer edge, so
+// wrapping stays clean.
 .kpi-row {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  overflow: hidden;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--r-panel);
+  corner-shape: var(--corner);
 }
 
 .card {
@@ -275,14 +305,14 @@ code {
     cursor: default;
   }
 
+  // The screen's one main action: an accent hairline, never a filled block.
   &.primary {
-    background: var(--accent);
-    border-color: transparent;
-    color: var(--on-accent);
+    border-color: var(--accent);
+    background: transparent;
     font-weight: 600;
 
     &:hover {
-      background: var(--accent-hover);
+      background: var(--hover-wash);
     }
   }
 
@@ -302,35 +332,31 @@ code {
   }
 }
 
-// Segmented control for presets (range, rank).
+// Presets (range, rank) as text tabs: the chosen one is ink with an accent underline.
 .segmented {
   display: inline-flex;
-  padding: 2px;
-  border: 1px solid var(--border);
-  border-radius: var(--r-control);
-  corner-shape: var(--corner);
-  background: var(--well);
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
 
   button {
-    height: 28px;
-    padding: 0 10px;
+    height: 30px;
+    margin-bottom: -1px;
+    padding: 0 8px;
     border: 0;
-    border-radius: var(--r-control);
-    corner-shape: var(--corner);
+    border-bottom: 1px solid transparent;
     background: transparent;
     color: var(--text-secondary);
     font: inherit;
     cursor: pointer;
 
     &:hover {
-      background: var(--hover-wash);
+      color: var(--text-primary);
     }
 
     &[aria-pressed="true"] {
-      background: var(--accent-wash);
+      border-bottom-color: var(--accent);
       color: var(--text-primary);
       font-weight: 600;
-      box-shadow: inset 0 0 0 1px var(--accent-line);
     }
   }
 }
@@ -390,7 +416,21 @@ table.data {
   }
 }
 
-// Value deltas: sign + arrow + color, never color alone.
+// An item name with its thumbnail, linking to the item's page. The link sits on the line's middle,
+// not the image's bottom edge, so text after it ("· rank 5") lines up with the name.
+.item-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  vertical-align: middle;
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+// Value deltas: the sign (+12% / -8%) and color, never color alone.
 .delta-up {
   color: var(--delta-up);
 }
@@ -413,7 +453,7 @@ table.data {
   border-radius: var(--r-control);
   corner-shape: var(--corner);
   background: var(--surface-2);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45); // taste-skill-ignore: a floating overlay
   font-size: 12.5px;
 
   .tt-title {

@@ -87,7 +87,7 @@ import {
     .line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
     .area, .band { opacity: 0.1; }
     .line.dashed { stroke-dasharray: 5 4; }
-    .key-dashed { width: 18px !important; background: repeating-linear-gradient(90deg, currentColor 0 5px, transparent 5px 8px); }
+    .key-dashed { width: 18px !important; height: 0 !important; border-top: 2px dashed currentColor; }
     .tt-range { color: var(--text-secondary); font-variant-numeric: tabular-nums; }
     .dot { stroke: var(--surface-1); stroke-width: 2; }
     .end-label { fill: var(--text-primary); font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }

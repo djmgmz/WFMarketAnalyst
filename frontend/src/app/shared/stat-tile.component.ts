@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 
-/** Stat tile: sentence-case label, proportional-figure value, optional note. */
+/** Stat tile: sentence-case label, tabular value, optional note. A cell of a `.kpi-row` panel. */
 @Component({
   selector: 'app-stat-tile',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -13,10 +13,10 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
     <ng-content />
   `,
   styles: `
-    :host { display: block; background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--r-panel);
-            corner-shape: var(--corner); padding: 14px 16px; min-width: 0; }
+    :host { display: block; padding: 14px 18px; min-width: 0; margin: -1px 0 0 -1px;
+            border-left: 1px solid var(--border); border-top: 1px solid var(--border); }
     .label { color: var(--text-secondary); font-size: 12.5px; }
-    .value { font-size: 26px; font-weight: 600; letter-spacing: -0.01em; margin-top: 2px; line-height: 1.2;
+    .value { font-size: 22px; font-weight: 600; letter-spacing: -0.01em; margin-top: 2px; line-height: 1.2;
               font-variant-numeric: tabular-nums; }
     .note { color: var(--text-muted); font-size: 12px; margin-top: 4px; }
   `,

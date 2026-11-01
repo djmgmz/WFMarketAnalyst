@@ -11,7 +11,7 @@
     <nav aria-label="Main">
       @for (link of nav; track link.path) {
         <a class="nav-link" [routerLink]="link.path" routerLinkActive="active" ariaCurrentWhenActive="page">
-          <app-icon class="nav-icon" [name]="link.icon" />{{ link.label }}
+          <app-icon class="nav-icon" [name]="link.icon" /><span class="nav-label">{{ link.label }}</span>
         </a>
       }
     </nav>

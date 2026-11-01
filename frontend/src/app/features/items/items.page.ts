@@ -8,6 +8,7 @@ import { formatCredits, formatNumber, formatPlat, titleCase } from '../../core/f
 import { keepLast } from '../../core/keep-last';
 import { ItemQuery } from '../../core/models';
 import { EmptyStateComponent } from '../../shared/empty-state.component';
+import { IconComponent } from '../../shared/icon.component';
 import { ItemThumbComponent } from '../../shared/item-thumb.component';
 
 const PAGE_SIZE = 50;
@@ -22,7 +23,7 @@ const SORTS: { value: NonNullable<ItemQuery['sort']>; label: string }[] = [
 /** Searchable catalog. The URL query string is the single source of truth for filters. */
 @Component({
   selector: 'app-items-page',
-  imports: [RouterLink, ItemThumbComponent, EmptyStateComponent],
+  imports: [RouterLink, ItemThumbComponent, EmptyStateComponent, IconComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="page">
@@ -83,7 +84,7 @@ const SORTS: { value: NonNullable<ItemQuery['sort']>; label: string }[] = [
                       <a class="item-link" [routerLink]="['/items', item.slug]">
                         <app-item-thumb [image]="item.image" [name]="item.name" />
                         <span>{{ item.name }}</span>
-                        @if (item.watched) { <span class="watched" title="On watchlist" aria-label="On watchlist">★</span> }
+                        @if (item.watched) { <span class="watched" title="On watchlist" role="img" aria-label="On watchlist"><app-icon class="filled" name="watchlist" [size]="12" /></span> }
                       </a>
                     </td>
                     <td class="secondary">{{ item.category }}</td>
@@ -116,9 +117,10 @@ const SORTS: { value: NonNullable<ItemQuery['sort']>; label: string }[] = [
     </div>
   `,
   styles: `
-    .item-link { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; font-weight: 500; }
+    .item-link { gap: 10px; font-weight: 500; }
+    .item-link:hover { text-decoration: none; }
     .item-link:hover span:first-of-type { text-decoration: underline; }
-    .watched { color: var(--text-muted); font-size: 12px; }
+    .watched { display: inline-flex; vertical-align: -1px; margin-left: 6px; color: var(--text-muted); }
     .tags { display: flex; gap: 4px; flex-wrap: wrap; }
     .pager { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; }
     .pager-buttons { display: inline-flex; gap: 6px; }

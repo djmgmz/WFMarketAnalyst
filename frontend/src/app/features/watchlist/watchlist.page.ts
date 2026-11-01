@@ -6,12 +6,13 @@ import { ApiService } from '../../core/api.service';
 import { formatPlat, timeAgo } from '../../core/format';
 import { WatchRow } from '../../core/models';
 import { EmptyStateComponent } from '../../shared/empty-state.component';
+import { IconComponent } from '../../shared/icon.component';
 import { ItemThumbComponent } from '../../shared/item-thumb.component';
 
 /** Items the user tracks, with a target price. The recorder snapshots these every 15 minutes. */
 @Component({
   selector: 'app-watchlist-page',
-  imports: [RouterLink, EmptyStateComponent, ItemThumbComponent],
+  imports: [RouterLink, EmptyStateComponent, ItemThumbComponent, IconComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="page">
@@ -42,7 +43,7 @@ import { ItemThumbComponent } from '../../shared/item-thumb.component';
                     </td>
                     <td>
                       @switch (status(row)) {
-                        @case ('hit') { <span class="status hit">✓ At or below target</span> }
+                        @case ('hit') { <span class="status hit"><app-icon name="check" [size]="13" />At or below target</span> }
                         @case ('above') { <span class="status">Above target</span> }
                         @case ('no-target') { <span class="muted">No target set</span> }
                         @default { <span class="muted">No price yet</span> }
@@ -65,11 +66,10 @@ import { ItemThumbComponent } from '../../shared/item-thumb.component';
     </div>
   `,
   styles: `
-    .item-link { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; font-weight: 500; }
-    .item-link:hover { text-decoration: underline; }
+    .item-link { gap: 10px; font-weight: 500; }
     .target { min-width: 0; width: 90px; text-align: right; }
     .small { font-size: 11.5px; }
-    .status.hit { color: var(--delta-up); font-weight: 600; }
+    .status.hit { display: inline-flex; align-items: center; gap: 5px; color: var(--delta-up); font-weight: 600; }
   `,
 })
 export class WatchlistPage {

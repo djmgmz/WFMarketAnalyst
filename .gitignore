@@ -19,3 +19,6 @@ node_modules/
 
 # Third-party Claude Code skills (kept locally, see .claude/skills/SOURCES.md)
 .claude/skills/
+
+# Working files of the taste-skill design skill
+.taste-skill/

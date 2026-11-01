@@ -11,15 +11,17 @@ import { ColumnChartComponent } from '../../shared/charts/column-chart.component
 import { LineChartComponent } from '../../shared/charts/line-chart.component';
 import { Series } from '../../shared/charts/scale';
 import { EmptyStateComponent } from '../../shared/empty-state.component';
+import { IconComponent } from '../../shared/icon.component';
 import { ItemThumbComponent } from '../../shared/item-thumb.component';
 
 @Component({
   selector: 'app-item-detail-page',
-  imports: [NgTemplateOutlet, RouterLink, LineChartComponent, ColumnChartComponent, EmptyStateComponent, ItemThumbComponent],
+  imports: [NgTemplateOutlet, RouterLink, LineChartComponent, ColumnChartComponent, EmptyStateComponent, ItemThumbComponent,
+            IconComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="page">
-      <a class="back muted" routerLink="/items">← All items</a>
+      <a class="back muted" routerLink="/items"><app-icon name="back" [size]="14" />All items</a>
 
       @if (item.error()) {
         <app-empty-state title="Item not found">No item with the slug <code>{{ slug() }}</code> is in the catalog.</app-empty-state>
@@ -37,11 +39,11 @@ import { ItemThumbComponent } from '../../shared/item-thumb.component';
           </div>
           <div class="hero-actions">
             @if (it.watch) {
-              <button class="btn" type="button" (click)="unwatch()">★ Watching</button>
+              <button class="btn" type="button" (click)="unwatch()"><app-icon class="filled" name="watchlist" [size]="15" />Watching</button>
             } @else {
-              <button class="btn primary" type="button" (click)="watch()">☆ Add to watchlist</button>
+              <button class="btn primary" type="button" (click)="watch()"><app-icon name="watchlist" [size]="15" />Add to watchlist</button>
             }
-            @if (it.wiki_link) { <a class="btn ghost" [href]="it.wiki_link" target="_blank" rel="noopener">Wiki ↗</a> }
+            @if (it.wiki_link) { <a class="btn ghost" [href]="it.wiki_link" target="_blank" rel="noopener" title="Opens the Warframe wiki in a new tab">Wiki<app-icon name="external" [size]="13" /></a> }
           </div>
         </header>
 
@@ -171,13 +173,17 @@ import { ItemThumbComponent } from '../../shared/item-thumb.component';
     </ng-template>
   `,
   styles: `
-    .back { text-decoration: none; font-size: 13px; }
+    .back { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; text-decoration: none; font-size: 13px; }
     .back:hover { text-decoration: underline; }
     .hero { display: flex; gap: 18px; align-items: flex-start; }
     .hero-text { flex: 1; min-width: 0; }
     .chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
     .description { margin: 10px 0 0; color: var(--text-secondary); white-space: pre-line; max-width: 720px; }
     .hero-actions { display: flex; gap: 8px; }
+    @media (max-width: 600px) {
+      .hero { flex-wrap: wrap; }
+      .hero-actions { flex-basis: 100%; }
+    }
     .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 14px; }
     .fact-label { color: var(--text-muted); font-size: 12px; }
     .fact-value { font-size: 16px; font-weight: 600; }
@@ -186,8 +192,6 @@ import { ItemThumbComponent } from '../../shared/item-thumb.component';
     .side { font-size: 13px; margin-bottom: 6px; }
     .strong { font-weight: 600; }
     .top-actions { display: inline-flex; align-items: center; gap: 10px; }
-    .item-link { display: inline-flex; align-items: center; gap: 8px; text-decoration: none; }
-    .item-link:hover { text-decoration: underline; }
     .refetching { opacity: 0.6; transition: opacity 0.15s; }
     .excluded-line { margin: 10px 0 0; font-size: 12.5px; }
     .forecast-line { margin: 10px 0 0; font-size: 13px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
@@ -262,7 +266,8 @@ export class ItemDetailPage {
         points: h.closed.map((p) => ({ t: Date.parse(p.bucket), v: p.median })),
       });
     }
-    if (h.live.sell.some((p) => p.ask !== null)) {  // every listing a joke: no listings line at all
+    // When every listing is a joke there is no listings line at all.
+    if (h.live.sell.some((p) => p.ask !== null)) {
       series.push({
         key: 'listed', label: 'Sell listings', color: 'var(--series-2)',
         points: h.live.sell.map((p) => ({ t: Date.parse(p.bucket), v: p.ask })),
@@ -294,7 +299,8 @@ export class ItemDetailPage {
   protected readonly excludedNote = computed(() => {
     const excluded = this.lastHistory()?.excluded ?? [];
     if (!excluded.length) return null;
-    const exact = (n: number | null) => (n ?? 0).toLocaleString('en-US');  // 99,999, not 100K: the oddness is the point
+    // 99,999, not 100K: the oddness is the point
+    const exact = (n: number | null) => (n ?? 0).toLocaleString('en-US');
     const when = (bucket: string) => (this.granularity() === 'day' ? formatDay(Date.parse(bucket)) : formatDateTime(bucket));
     const shown = excluded.slice(0, 3)
       .map((p) => `${when(p.bucket)} (${exact(p.volume)} at ${exact(p.median)}p)`).join(', ');

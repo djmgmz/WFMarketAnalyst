@@ -74,8 +74,7 @@ import { StatTileComponent } from '../../shared/stat-tile.component';
     </div>
   `,
   styles: `
-    .item-link { display: inline-flex; align-items: center; gap: 8px; text-decoration: none; margin-right: 6px; }
-    .item-link:hover { text-decoration: underline; }
+    .item-link { margin-right: 6px; }
   `,
 })
 export class DucatsPage {

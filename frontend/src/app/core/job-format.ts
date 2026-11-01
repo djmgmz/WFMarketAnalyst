@@ -1,16 +1,17 @@
 // How jobs read in the sidebar and the Overview panel. Everything here keys off a
 // job's definition (kind, resumable, scoped) from the backend, never its name.
 
+import type { IconName } from '../shared/icon.component';
 import { formatNumber, timeAgo } from './format';
 import { Job, JobRun, JobState, JobWithRun } from './models';
 
 /** Status label + icon: state is never carried by color alone. */
-export const STATE_LABELS: Record<JobState, { icon: string; label: string }> = {
-  running: { icon: '●', label: 'Running' },
-  stalled: { icon: '⚠', label: 'Not responding' },
-  finished: { icon: '✓', label: 'Finished' },
-  stopped: { icon: '■', label: 'Stopped' },
-  failed: { icon: '✕', label: 'Failed' },
+export const STATE_LABELS: Record<JobState, { icon: IconName; label: string }> = {
+  running: { icon: 'running', label: 'Running' },
+  stalled: { icon: 'warning', label: 'Not responding' },
+  finished: { icon: 'check', label: 'Finished' },
+  stopped: { icon: 'stopped', label: 'Stopped' },
+  failed: { icon: 'failed', label: 'Failed' },
 };
 
 export function seconds(fromIso: string, now: number): number {
