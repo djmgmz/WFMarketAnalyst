@@ -1,4 +1,4 @@
-"""Item images module: pictures for catalog items, from the Warframe community's item database (WFCD).
+"""Item images module: catalog item pictures from the Warframe community's database (WFCD).
 
 warframe.market's own image server sits behind a bot check, so images come from WFCD instead
 (https://github.com/WFCD/warframe-items), matched to our catalog by in-game id. Files are stored
@@ -7,8 +7,8 @@ once under data/images/ and served locally; none of this touches warframe.market
 Interface::
 
     sync_images(conn, source, images_dir, job=NO_REPORT)
-                     match every catalog item to a community image and download the files it lacks;
-                     returns ImagesSynced. Resumable: files already on disk are not downloaded again.
+                     match every catalog item to a community image and download the files it
+                     lacks; returns ImagesSynced. Resumable: files on disk are not fetched again.
     ImageSource      the seam: items() -> community item list, image(name) -> file bytes
     HttpImageSource  the real adapter (public WFCD API and image CDN), polite and identified
 
@@ -147,7 +147,8 @@ async def sync_images(conn: sqlite3.Connection, source: ImageSource, images_dir:
             job.working_on(name)
             data = await _download(source, name)
             if data is not None:
-                part = images_dir / f".{name}.{os.getpid()}.part"  # never shared with another process
+                # Named per process, so two runs never write the same file.
+                part = images_dir / f".{name}.{os.getpid()}.part"
                 part.write_bytes(data)
                 part.replace(images_dir / name)
                 await retry_locked(conn, lambda: _record(conn, name, items_by_file[name]))

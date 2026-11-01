@@ -141,8 +141,9 @@ export class LineChartComponent {
       ? `${lines[0].d}L${x(first.points[first.points.length - 1].t)},${baseline}L${x(first.points[0].t)},${baseline}Z`
       : null;
 
-    // End labels: drop a label that would collide with one already placed (the legend still names it).
-    // A line continued by a dashed projection (e.g. a forecast) leaves the label to the projection's end.
+    // End labels: a label that would collide with one already placed is dropped (the legend still
+    // names its series). A line continued by a dashed projection, such as a forecast, leaves the
+    // label to the projection's end.
     const continued = new Set(this.series().filter((s) => s.dashed && s.points.length).map((s) => `${s.color}@${s.points[0].t}`));
     const placed: number[] = [];
     const ends = this.series().flatMap((s) => {

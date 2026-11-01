@@ -68,14 +68,14 @@ def upsert_item(conn: sqlite3.Connection, record: Record, synced_at: str, *, det
 
 @dataclass(frozen=True)
 class SyncPlan:
-    """What a catalog sync has to fetch, decided from stored versions without touching the network."""
+    """What a catalog sync has to fetch, decided from stored versions without the network."""
 
     item_list: bool
     kinds: tuple[str, ...]  # auxiliary collection kinds
 
 
 def plan_sync(conn: sqlite3.Connection, versions: dict[str, str], *, force: bool = False) -> SyncPlan:
-    """A collection is stale when its stored version differs from warframe.market's, or it was never stored.
+    """A collection is stale when its stored version differs from warframe.market's or is missing.
 
     Versions are stored only together with the data they describe (see sync_item_list,
     sync_aux), so an interrupted sync is simply still stale next time. Item details
@@ -111,7 +111,7 @@ async def sync_item_list(market: Market, conn: sqlite3.Connection, version: str 
 
 
 def forget_details(conn: sqlite3.Connection) -> int:
-    """Mark every item as lacking details, so the next details pass refetches them all (resumably)."""
+    """Mark every item as lacking details, so the next details pass refetches all (resumably)."""
     count = conn.execute("UPDATE items SET detail_synced_at = NULL WHERE detail_synced_at IS NOT NULL").rowcount
     conn.commit()
     return count
@@ -169,7 +169,7 @@ async def sync_item_details(
 async def sync_aux(
     market: Market, conn: sqlite3.Connection, kinds: Iterable[str], versions: dict[str, str]
 ) -> dict[str, int | str]:
-    """Replace the given auxiliary kinds. A collection's version is stored once all its kinds succeed."""
+    """Replace the given auxiliary kinds; a collection's version is stored once all succeed."""
     results: dict[str, int | str] = {}
     for kind in kinds:
         try:

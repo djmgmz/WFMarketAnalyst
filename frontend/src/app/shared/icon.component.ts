@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 
-/** Line icons drawn on a 20px grid with one stroke weight; the angular joins echo the bevelled panels. */
+/** Line icons on a 20px grid with one stroke weight; angular joins echo the bevelled panels. */
 const PATHS = {
   overview: 'M3 3h6v6H3zM11 3h6v4h-6zM11 9h6v8h-6zM3 11h6v6H3z',
   items: 'M3 5h2M8 5h9M3 10h2M8 10h9M3 15h2M8 15h9',

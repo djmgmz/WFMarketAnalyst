@@ -32,19 +32,28 @@ def test_images_match_by_game_id_relic_part_and_unique_name():
     from wfm.images import match_images
 
     catalog = [
-        ("a", "Arcane Energize", "/Lotus/Arcane/Energize"),         # exact in-game id
-        ("r", "Lith G1 Relic", "/Lotus/Projections/T1G"),           # the exact id wins over the intact version
-        ("r2", "Lith G2 Relic", "/Lotus/Projections/T1GX"),         # no match at all
-        ("n", "Ash Prime Neuroptics Blueprint", "/Lotus/Recipes/AshPrimeHelmetBlueprint"),  # part -> component
-        ("b", "Ash Prime Blueprint", "/Lotus/Recipes/AshPrimeBlueprint"),                   # nested component id
-        ("q", "Quick Thinking", "/Lotus/Mods/QuickThinking"),       # unique name
-        ("s", "Shared Name", "/Lotus/Other"),                       # ambiguous name: not guessed
-        ("e", "Evil", "/Lotus/Evil"),                               # unsafe file name: ignored
+        # Exact in-game id.
+        ("a", "Arcane Energize", "/Lotus/Arcane/Energize"),
+        # The exact id wins over the intact version.
+        ("r", "Lith G1 Relic", "/Lotus/Projections/T1G"),
+        # No match at all.
+        ("r2", "Lith G2 Relic", "/Lotus/Projections/T1GX"),
+        # Part blueprint -> the community's component.
+        ("n", "Ash Prime Neuroptics Blueprint", "/Lotus/Recipes/AshPrimeHelmetBlueprint"),
+        # Nested component id.
+        ("b", "Ash Prime Blueprint", "/Lotus/Recipes/AshPrimeBlueprint"),
+        # Unique name.
+        ("q", "Quick Thinking", "/Lotus/Mods/QuickThinking"),
+        # Ambiguous name: not guessed.
+        ("s", "Shared Name", "/Lotus/Other"),
+        # Unsafe file name: ignored.
+        ("e", "Evil", "/Lotus/Evil"),
     ]
     assert match_images(COMMUNITY_ITEMS, catalog) == {
         "a": "Energize.png", "r": "Unused.png", "n": "PrimeHelmet.png", "b": "blueprint.png", "q": "QuickThinking.jpg"}
     relic_only = [("r", "Lith G1 Relic", "/Lotus/Projections/T1G")]
-    assert match_images(COMMUNITY_ITEMS[2:3], relic_only) == {"r": "RelicLith.png"}  # base relic -> intact version
+    # A base relic gets its intact version's image.
+    assert match_images(COMMUNITY_ITEMS[2:3], relic_only) == {"r": "RelicLith.png"}
 
 
 class FakeImageSource:
@@ -79,10 +88,12 @@ def test_sync_images_downloads_each_file_once_and_resumes(conn, tmp_path, monkey
     first = FakeImageSource(community, broken={"QuickThinking.jpg"})
     notes = Notes()
     summary = asyncio.run(images.sync_images(conn, first, folder, notes))
-    assert sorted(first.downloads) == ["Energize.png", "QuickThinking.jpg", "blueprint.png"]  # the shared file once
+    # The shared file is downloaded once.
+    assert sorted(first.downloads) == ["Energize.png", "QuickThinking.jpg", "blueprint.png"]
     assert summary._asdict() == {"items": 4, "matched": 4, "files": 3, "downloaded": 2, "already_had": 0, "failed": 1}
     stored = dict(conn.execute("SELECT id, image FROM items"))
-    assert stored == {"a": "Energize.png", "b1": "blueprint.png", "b2": "blueprint.png", "q": None}  # failed: unset
+    # A failed download leaves the item without an image.
+    assert stored == {"a": "Energize.png", "b1": "blueprint.png", "b2": "blueprint.png", "q": None}
     assert (folder / "blueprint.png").read_bytes() == b"bytes of blueprint.png" and not list(folder.glob(".*.part"))
     assert notes.done == 3
 
@@ -90,7 +101,8 @@ def test_sync_images_downloads_each_file_once_and_resumes(conn, tmp_path, monkey
     (folder / "Energize.png").unlink()
     again = FakeImageSource(community, broken={"Energize.png"})
     summary = asyncio.run(images.sync_images(conn, again, folder))
-    assert sorted(again.downloads) == ["Energize.png", "QuickThinking.jpg"]  # resumes: only missing files
+    # Resumes: only the missing files.
+    assert sorted(again.downloads) == ["Energize.png", "QuickThinking.jpg"]
     assert (summary.already_had, summary.downloaded, summary.failed) == (1, 1, 1)
     stored = dict(conn.execute("SELECT id, image FROM items"))
     assert stored == {"a": None, "b1": "blueprint.png", "b2": "blueprint.png", "q": "QuickThinking.jpg"}

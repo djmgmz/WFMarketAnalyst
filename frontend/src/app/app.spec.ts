@@ -22,6 +22,7 @@ describe('App', () => {
     const fixture = TestBed.createComponent(App);
     await fixture.whenStable();
     const links = [...(fixture.nativeElement as HTMLElement).querySelectorAll('nav a')].map((a) => a.textContent?.trim());
-    expect(links).toEqual(['Overview', 'Items', 'Ducats', 'Forecast', 'Watchlist']); // icons are SVG, not text
+    // The icons are SVG, so each link's text is only its label.
+    expect(links).toEqual(['Overview', 'Items', 'Ducats', 'Forecast', 'Watchlist']);
   });
 });

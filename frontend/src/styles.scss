@@ -1,7 +1,7 @@
-// Tokens: warframe.market's palette (sampled from the site; see PRODUCT.md), dark only.
-// Slate-teal grounds, their interactive teal for the active place / selection / primary action / focus,
-// their green for rises and live state. Chart series are dataviz-validated against --surface-1; charts
-// reference roles, never raw hex.
+// Tokens: warframe.market's palette (sampled from the site), dark only. Slate-teal grounds, its
+// interactive teal for the active place, selection, the primary action and focus, and its green for
+// rises and live state. Chart series are dataviz-validated against --surface-1; charts reference
+// roles, never raw hex.
 
 :root {
   color-scheme: dark;
@@ -31,8 +31,8 @@
   --focus: var(--accent);
   --font: system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-display: "Chakra Petch", var(--font);
-  // Corner language: Warframe's bevelled UI tiles (top-left and bottom-right cut), at panel and control size.
-  // Browsers without corner-shape get small round corners instead.
+  // Corner language: Warframe's bevelled UI tiles (top-left and bottom-right cut), at panel and
+  // control size. Browsers without corner-shape get small round corners instead.
   --corner: round;
   --r-panel: 6px;
   --r-control: 4px;

@@ -89,7 +89,8 @@ async def backfill_stats(
     todo = [slug for slug in slugs if ids.get(slug) not in fresh]
     skipped = len(slugs) - len(todo)
     if skipped:
-        job.note(skipped=skipped)  # counted as done up front; the ETA uses only the items actually fetched
+        # Counted as done up front; the ETA uses only the items actually fetched
+        job.note(skipped=skipped)
         for _ in range(skipped):
             job.advance()
     done = stored = 0

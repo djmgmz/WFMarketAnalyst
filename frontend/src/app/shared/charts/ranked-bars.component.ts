@@ -58,7 +58,7 @@ export class RankedBarsComponent {
 
   protected readonly rows = computed(() => {
     const sorted = [...this.data()].sort((a, b) => b.value - a.value);
-    // Scale to the largest value (values can be fractions, e.g. shares).
+    // Scaled to the largest value, not a fixed maximum: values can be fractions (shares).
     const max = Math.max(0, ...sorted.map((r) => r.value)) || 1;
     // Leave room at the tip for the value label.
     return sorted.map((r) => ({ ...r, pct: (r.value / max) * 82 }));

@@ -1,16 +1,17 @@
-"""Forecast module: each item's price tomorrow and its average over the next 7 days, with an 80% range.
+"""Forecast module: each item's price tomorrow and its next-7-day average, with an 80% range.
 
 A forecast for horizon h is the average latest price over the next h days, so h = 1 is
 tomorrow's price and h = 7 is next week's average (a single day's median is mostly noise).
 
 Interface::
 
-    train(conn, job=NO_REPORT)                 build the dataset, test the model against baselines,
-                                               store fresh forecasts and the report; returns the report
+    train(conn, job=NO_REPORT)                 build the dataset, test the model against
+                                               baselines, store fresh forecasts and the report;
+                                               returns the report
     forecast_for(conn, item_id, rank)          stored forecasts for one item (one per horizon)
     predicted_movers(conn, horizon, limit, by="gain")
-                                               biggest predicted rises and falls (model forecasts only),
-                                               by platinum ("gain") or percentage ("change")
+                                               biggest predicted rises and falls (model forecasts
+                                               only), by platinum ("gain") or percentage ("change")
     search(conn, query, horizon, limit)        forecasts for items whose name matches, by name
     latest_report(conn)                        the most recent evaluation report, or None
 
@@ -84,7 +85,10 @@ _LGB_PARAMS = dict(n_estimators=300, learning_rate=0.05, num_leaves=15, min_chil
 # ---------------------------------------------------------------------------
 
 def train(conn: sqlite3.Connection, job: Reporter = NO_REPORT) -> dict[str, Any]:
-    """Test the model, then store forecasts for every item with recent history. Raises ValueError without data."""
+    """Test the model, then store forecasts for every item with recent history.
+
+    Raises ValueError when there is no price history to learn from.
+    """
     steps = 2 + len(HORIZONS) * (1 + len(QUANTILES)) * 2
     job.set_total(steps)
     job.working_on("building the dataset")
@@ -139,9 +143,11 @@ def forecast_for(conn: sqlite3.Connection, item_id: str, rank: int | None) -> li
 
 def predicted_movers(conn: sqlite3.Connection, horizon: int, limit: int,
                      by: str = "gain") -> dict[str, list[dict[str, Any]]]:
-    """Largest predicted moves among model forecasts (baseline forecasts predict no change), ranked
-    `by` platinum gained or lost ("gain") or by percentage ("change"). Moves under MIN_MOVE_PLAT are
-    left out: prices are whole platinum, so they could not be traded on."""
+    """Largest predicted moves among model forecasts (baseline forecasts predict no change).
+
+    Ranked `by` platinum gained or lost ("gain") or by percentage ("change"). Moves under
+    MIN_MOVE_PLAT are left out: prices are whole platinum, so they could not be traded on.
+    """
     if by not in MOVER_RANKINGS:
         raise ValueError(f"by must be one of {MOVER_RANKINGS}")
     rows = _forecast_rows(conn, "f.horizon = ? AND f.method = 'model' AND f.base_price > 0 AND ABS(f.predicted - f.base_price) >= ?",
@@ -237,7 +243,7 @@ def _dataset(conn: sqlite3.Connection) -> pd.DataFrame:
 
 
 def _series(g: pd.DataFrame, live: pd.DataFrame | None) -> pd.DataFrame:
-    """Features and targets for one (item, rank) daily series. Everything at day t uses days <= t only."""
+    """Features and targets for one (item, rank) daily series; day t uses days <= t only."""
     s = g.set_index("date").sort_index()
     s = s[~s.index.duplicated(keep="last")]
     days = pd.date_range(s.index.min(), s.index.max(), freq="D")
@@ -270,7 +276,8 @@ def _series(g: pd.DataFrame, live: pd.DataFrame | None) -> pd.DataFrame:
     out["ma_gap"] = logp - np.log(s["moving_avg"].ffill().where(lambda v: v > 0))
 
     if "ask_sell" in s:
-        sell = s["ask_sell"].where(lambda v: v > 0)  # prices.asking_price: the lowest listing when there are few
+        # prices.asking_price: the lowest listing when there are few
+        sell = s["ask_sell"].where(lambda v: v > 0)
         out["listing_premium"] = np.log(sell) - logp
         out["spread"] = np.log(sell / s.get("median_buy", pd.Series(np.nan, index=days)).where(lambda v: v > 0))
         out["log_supply"] = np.log1p(s.get("volume_sell", pd.Series(np.nan, index=days)))
@@ -281,7 +288,7 @@ def _series(g: pd.DataFrame, live: pd.DataFrame | None) -> pd.DataFrame:
     out["level"] = np.log(median_28)
     out["band"] = pd.cut(median_28, bins=BAND_EDGES, labels=BAND_LABELS, right=False).astype(object)
     out["dow"] = days.day_of_week
-    # Genuine trading days in the window prices.liquid_series uses; thinner series get no model forecast.
+    # Genuine trading days in prices.liquid_series' window; thinner series get no model forecast.
     out["trade_days"] = traded.astype(float).rolling(LIQUID_WINDOW_DAYS, min_periods=1).sum()
 
     for h in HORIZONS:
@@ -308,8 +315,11 @@ def _latest_rows(data: pd.DataFrame, last_date: pd.Timestamp) -> pd.DataFrame:
 # ---------------------------------------------------------------------------
 
 def _split(labelled: pd.DataFrame, cutoff: pd.Timestamp, h: int) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Walk-forward split: test on days after the cutoff; train only on rows whose label
-    (the price h days later) is known by the cutoff, so no training label reaches into the test window."""
+    """Walk-forward split: test on the days after the cutoff.
+
+    Training uses only rows whose label (the price h days later) is known by the cutoff, so no
+    training label reaches into the test window.
+    """
     return labelled[labelled["date"] + pd.Timedelta(days=h) <= cutoff], labelled[labelled["date"] > cutoff]
 
 
@@ -340,7 +350,7 @@ def _predict(models: dict[str, lgb.LGBMRegressor], rows: pd.DataFrame) -> pd.Dat
 
 
 def _metrics(rows: pd.DataFrame, pred: pd.DataFrame | None, target: str, h: int) -> dict[str, Any]:
-    """Model vs baselines on held-out rows. Skill uses log error, so every price level counts equally."""
+    """Model vs baselines on held-out rows; skill uses log error, so every price level counts."""
     actual = rows[target].to_numpy()
     base = rows["price"].to_numpy()
     naive_error = np.abs(actual)
@@ -402,8 +412,11 @@ def _evaluate(train_rows: pd.DataFrame, test_rows: pd.DataFrame, target: str, h:
 
 def _forecast(latest: pd.DataFrame, models: dict[str, lgb.LGBMRegressor] | None, uses_model: dict[str, dict[str, bool]],
               labelled: pd.DataFrame, target: str, h: int) -> list[dict[str, Any]]:
-    """One forecast per recent series: the model where its segments earned it and the series trades
-    often enough (prices.LIQUID_MIN_DAYS); otherwise the naive baseline."""
+    """One forecast per recent series, from the model where it has earned it, else the baseline.
+
+    The model is used where it beat the baseline for the series' segments and the series trades
+    often enough (prices.LIQUID_MIN_DAYS).
+    """
     if latest.empty:
         return []
     pred = _predict(models, latest) if models else None

@@ -106,7 +106,7 @@ export interface LivePoint {
   min_price: number | null;
   max_price: number | null;
   median: number | null;
-  /** What sellers really ask: the median listing, or the lowest one when there are fewer than 5. */
+  /** What sellers really ask: the median listing, or the lowest one when there are only a few. */
   ask: number | null;
 }
 
@@ -118,7 +118,7 @@ export interface History {
   granularity: Granularity;
   /** Completed trades, without the days that look faked. */
   closed: ClosedPoint[];
-  /** Days left out of `closed` as likely faked trades (kept in the data, never counted in prices). */
+  /** Days left out of `closed` as likely faked trades (kept, but never counted in prices). */
   excluded: ClosedPoint[];
   live: { sell: LivePoint[]; buy: LivePoint[] };
 }
@@ -313,7 +313,10 @@ export interface ForecastSearch {
   forecasts: ItemForecast[];
 }
 
-/** Accuracy on the held-out test days. Skill: 1 - model error / "no change" error (above 0 = better). */
+/**
+ * Accuracy on the held-out test days. Skill is 1 - model error / "no change" error: above 0 is
+ * better than assuming no change.
+ */
 export interface ForecastMetrics {
   n: number;
   naive_mae_plat: number;

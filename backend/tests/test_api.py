@@ -20,8 +20,10 @@ def test_history_and_movers(client, conn, tmp_path):
     backfill(conn, tmp_path)
     hist = client.get("/api/items/arcane_energize/history").json()
     assert hist["rank"] == 0 and [p["median"] for p in hist["closed"]] == [100.0, 125.0]
-    assert hist["live"]["sell"][0]["median"] == 130 and hist["live"]["sell"][0]["ask"] == 130  # 50 listings
-    assert client.get("/api/movers", params={"min_volume": 0}).json()["gainers"] == []  # 2 trading days: too thin
+    # 50 listings, so the asking price is the median.
+    assert hist["live"]["sell"][0]["median"] == 130 and hist["live"]["sell"][0]["ask"] == 130
+    # Two trading days are too thin to rank.
+    assert client.get("/api/movers", params={"min_volume": 0}).json()["gainers"] == []
 
     from wfm import prices  # ten genuine trading days make it liquid enough to rank
     prices.store(conn, "i1", [{"source": "closed", "granularity": "day", "mod_rank": 0, "subtype": "", "order_type": "",

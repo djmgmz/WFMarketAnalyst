@@ -100,13 +100,16 @@ export class JobsPanelComponent {
   private readonly api = inject(ApiService);
   protected readonly states = STATE_LABELS;
 
-  /** The scope of the last scoped run, so Resume continues that run rather than starting another. */
+  /** The last scoped run's scope, so Resume continues that run rather than starting another. */
   private readonly lastScope = computed(() => {
     const label = this.service.jobs().find((job) => job.scoped)?.run?.detail.scope;
     return label === 'items with history' ? 'history' : label === 'watchlist' ? 'watchlist'
       : label && this.categories().some((c) => c.category === label) ? label : 'Arcane';
   });
-  /** Scope for jobs that need one: 'history', 'watchlist' or a category name. Follows the last run until changed. */
+  /**
+   * Scope for jobs that need one: 'history', 'watchlist' or a category name. Follows the last
+   * run until the user changes it.
+   */
   protected readonly scope = linkedSignal(() => this.lastScope());
   protected readonly busy = signal<JobName | null>(null);
   protected readonly errors = signal<Partial<Record<JobName, string>>>({});

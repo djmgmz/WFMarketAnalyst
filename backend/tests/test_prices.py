@@ -1,4 +1,4 @@
-"""Price history: the default-rank rule, the latest price, suspect trades, liquidity and asking prices."""
+"""Price history: default rank, latest price, suspect trades, liquidity and asking prices."""
 
 from __future__ import annotations
 
@@ -42,7 +42,10 @@ def _item(conn, item_id, **fields):
 
 
 def test_faked_trades_are_flagged_and_left_out_of_prices(conn):
-    """The Xiphos Set pattern: a quiet item 'sells' 199 units at 99,999p, 50 at 9,999p and dumps 151 in a day."""
+    """The Xiphos Set pattern: days far off the item's own price or volume are flagged.
+
+    A quiet item "sells" 199 units at 99,999p, 50 at 9,999p, and dumps 151 in a day.
+    """
     _item(conn, "x")
     days = [_day(1, 25, 1), _day(5, 100, 1), _day(9, 99999, 199), _day(12, 50, 1), _day(15, 9999, 50),
             _day(18, 100, 1), _day(21, 50, 151), _day(24, 250, 1), _day(27, 85, 1), _day(29, 99999, 2)]
@@ -50,8 +53,10 @@ def test_faked_trades_are_flagged_and_left_out_of_prices(conn):
 
     flagged = [r[0][8:10] for r in conn.execute(
         "SELECT bucket FROM price_stats WHERE item_id = 'x' AND suspect = 1 ORDER BY bucket")]
-    assert flagged == ["09", "15", "21", "29"]  # price 20,000x off, 100x off, a 150x volume dump, the newest day
-    assert conn.execute("SELECT price FROM item_prices WHERE item_id = 'x'").fetchone()[0] == 85.0  # not 99,999
+    # Price 20,000x off, 100x off, a 150x volume dump, and the newest day.
+    assert flagged == ["09", "15", "21", "29"]
+    # The latest price is the genuine one, not 99,999p.
+    assert conn.execute("SELECT price FROM item_prices WHERE item_id = 'x'").fetchone()[0] == 85.0
     hist = prices.history(conn, conn.execute("SELECT * FROM items WHERE id = 'x'").fetchone(), "day")
     assert [p["bucket"][8:10] for p in hist["excluded"]] == flagged
     assert max(p["median"] for p in hist["closed"]) == 250  # the chart keeps only genuine days
@@ -62,7 +67,7 @@ def test_faked_trades_are_flagged_and_left_out_of_prices(conn):
 
 
 def test_the_real_xiphos_set_history_keeps_its_genuine_days(conn):
-    """Xiphos Set as recorded: a genuine 50p day sits between two fakes, which must not make it the odd one out."""
+    """Xiphos Set as recorded: a genuine 50p day between two fakes is not flagged."""
     _item(conn, "xiphos")
     recorded = [("08-06", 25, 1), ("08-17", 100, 1), ("09-03", 99999, 199), ("09-09", 50, 1), ("09-21", 9999, 50),
                 ("09-28", 100, 1), ("10-01", 50, 151), ("10-04", 250, 1), ("10-26", 85, 1)]
@@ -75,10 +80,12 @@ def test_the_real_xiphos_set_history_keeps_its_genuine_days(conn):
 
 def test_a_series_needs_enough_days_to_judge_and_real_busy_days_stay(conn):
     _item(conn, "new")
-    prices.store(conn, "new", [_day(1, 10, 1), _day(2, 900, 1), _day(3, 11, 1)])  # only 2 other days each
+    # Each day has only two other days to be judged against.
+    prices.store(conn, "new", [_day(1, 10, 1), _day(2, 900, 1), _day(3, 11, 1)])
     assert conn.execute("SELECT COUNT(*) FROM price_stats WHERE suspect = 1").fetchone()[0] == 0
     _item(conn, "busy")
-    prices.store(conn, "busy", [_day(d, 10, 1) for d in range(1, 8)] + [_day(9, 11, 15)])  # 15x, under 20 trades
+    # 15x the usual volume, but under 20 trades.
+    prices.store(conn, "busy", [_day(d, 10, 1) for d in range(1, 8)] + [_day(9, 11, 15)])
     assert conn.execute("SELECT COUNT(*) FROM price_stats WHERE suspect = 1").fetchone()[0] == 0
 
 
@@ -96,7 +103,8 @@ def test_regular_bulk_trading_and_a_settling_launch_price_are_not_flagged(conn):
 def test_variants_of_one_item_are_judged_apart(conn):
     _item(conn, "relic")
     intact = [{**_day(d, 6, 40), "subtype": "intact"} for d in range(1, 8)]
-    radiant = [{**_day(d, 60, 5), "subtype": "radiant"} for d in range(1, 8)]  # 10x the intact price, every day
+    # 10x the intact price, every day.
+    radiant = [{**_day(d, 60, 5), "subtype": "radiant"} for d in range(1, 8)]
     prices.store(conn, "relic", intact + radiant + [{**_day(9, 900, 5), "subtype": "radiant"}])
     flagged = conn.execute("SELECT subtype, bucket FROM price_stats WHERE item_id = 'relic' AND suspect = 1").fetchall()
     assert [(r[0], r[1][8:10]) for r in flagged] == [("radiant", "09")]  # only the radiant outlier
@@ -108,7 +116,7 @@ def test_a_set_far_from_the_sum_of_its_parts_is_flagged(conn):
     for part in parts:
         _item(conn, part, quantity_in_set=1)
         prices.store(conn, part, [_day(d, 30, 5) for d in range(1, 6)])  # parts: 60p together
-    # 130p is within 5x of the set's own days but more than 2x the parts' 60p; 25p (a cheap set) is fine.
+    # 130p is within 5x of the set's own days but over 2x the parts' 60p; a cheap 25p set is fine.
     prices.store(conn, "set", [_day(1, 55, 3), _day(2, 50, 3), _day(3, 130, 3), _day(4, 60, 3), _day(5, 25, 3)])
     flagged = [r[0][8:10] for r in conn.execute("SELECT bucket FROM price_stats WHERE item_id = 'set' AND suspect = 1")]
     assert flagged == ["03"]
@@ -139,11 +147,13 @@ def test_history_drops_asking_prices_nobody_pays(conn):
     prices.store(conn, "thin", [_day(d, 100, 1) for d in range(1, 6)])
     prices.store(conn, "thin", [listing(1, 1, 80000, 80000), listing(2, 3, 120, 4500), listing(3, 8, 90, 110)])
     hist = prices.history(conn, conn.execute("SELECT * FROM items WHERE id = 'thin'").fetchone(), "day")
-    assert [p["ask"] for p in hist["live"]["sell"]] == [None, 120, 110]  # junk, lowest of 3, median of 8
+    # Junk, the lowest of 3, the median of 8.
+    assert [p["ask"] for p in hist["live"]["sell"]] == [None, 120, 110]
 
 
 def test_asking_price_uses_the_lowest_listing_when_there_are_few():
-    assert prices.asking_price(4500, 1000, 4) == 1000  # four listings, one at 80,000p: the median means nothing
+    # Four listings, one at 80,000p: the median means nothing.
+    assert prices.asking_price(4500, 1000, 4) == 1000
     assert prices.asking_price(130, 110, 50) == 130
     assert prices.asking_price(None, None, None) is None
 

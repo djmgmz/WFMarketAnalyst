@@ -2,11 +2,14 @@
 
 Interface::
 
-    store(conn, item_id, records)          save Market price-history records (re-runs overwrite), then
-                                           flag the item's suspect days
-    flag_suspect(conn, item_ids=None)      (re)flag completed-trade days that look faked; returns the count
-    liquid_series(conn)                    (item id, stored rank) series with enough genuine trading to rank
-    asking_price(median, lowest, listings) what sellers really ask: the median, or the lowest listing when few
+    store(conn, item_id, records)          save Market price-history records (re-runs
+                                           overwrite), then flag the item's suspect days
+    flag_suspect(conn, item_ids=None)      (re)flag completed-trade days that look faked;
+                                           returns the count
+    liquid_series(conn)                    (item id, stored rank) series with enough genuine
+                                           trading to rank
+    asking_price(median, lowest, listings) what sellers really ask: the median, or the lowest
+                                           listing when there are few
     fetched_since(conn, since)             ids of items whose history was stored at or after `since`
     default_rank(max_rank)                 the rank a price refers to when none is given
     history(conn, item, granularity, rank) completed-trade and listing series for one item
@@ -22,17 +25,16 @@ Behind the interface: the price_stats table and its conventions (unranked items
 stored as rank -1, live rows split by order type), which rank a price means, the
 suspect-trade rules, and the movers / ducat calculations.
 
-Suspect trades: completed trades are self-reported, so one player can "sell" 199
-units at 99,999p. A day is judged against the same series' days within
-JUDGE_WINDOW_DAYS (each variant, such as a relic's refinement, is its own series).
-It is suspect when its median is more than SUSPECT_PRICE_RATIO times off their
-typical median and off the series' typical median overall, or its volume is more than SUSPECT_VOLUME_RATIO times their typical
-volume, at least SUSPECT_MIN_VOLUME, and more than BURST_RATIO times the busiest
-genuine day among them (a one-off dump, not an item regularly traded in bulk). A
-set's day is also suspect when its median is above SET_PRICE_RATIO times the sum
-of its parts' prices that day (and SET_MIN_PREMIUM above them). Only above: nobody really pays much more than the
-parts cost, since anyone can build the set from them, while sets often trade well
-below their parts.
+Suspect trades: completed trades are self-reported, so one player can "sell" 199 units at 99,999p. A
+day is judged against the same series' days within JUDGE_WINDOW_DAYS (each variant, such as a
+relic's refinement, is its own series). It is suspect when its median is more than
+SUSPECT_PRICE_RATIO times off their typical median and off the series' typical median overall, or
+its volume is more than SUSPECT_VOLUME_RATIO times their typical volume, at least
+SUSPECT_MIN_VOLUME, and more than BURST_RATIO times the busiest genuine day among them (a one-off
+dump, not an item regularly traded in bulk). A set's day is also suspect when its median is above
+SET_PRICE_RATIO times the sum of its parts' prices that day (and SET_MIN_PREMIUM above them). Only
+above: nobody really pays much more than the parts cost, since anyone can build the set from them,
+while sets often trade well below their parts.
 """
 
 from __future__ import annotations
@@ -50,19 +52,24 @@ from .db import parse_utc, utc_now
 Granularity = Literal["day", "hour"]
 UNRANKED = -1  # how price_stats stores "this item has no ranks"
 
-SUSPECT_PRICE_RATIO = 5     # a day's median this many times above or below the series' typical median
+# A day's median this many times above or below the series' typical median
+SUSPECT_PRICE_RATIO = 5
 SUSPECT_VOLUME_RATIO = 20   # or this many times its typical volume...
-SUSPECT_MIN_VOLUME = 20     # ...and at least this many trades (a quiet item's busy day of 3 is real)
+# ...and at least this many trades (a quiet item's busy day of 3 is real)
+SUSPECT_MIN_VOLUME = 20
 BURST_RATIO = 3             # ...and more than this many times the busiest genuine day near it
-SET_PRICE_RATIO = 2         # a set's median above this many times the sum of its parts' prices that day
-SET_MIN_PREMIUM = 20        # ...and at least this much above them (a few plat on a cheap set is normal)
+# A set's median above this many times the sum of its parts' prices that day
+SET_PRICE_RATIO = 2
+# ...and at least this much above them (a few plat on a cheap set is normal)
+SET_MIN_PREMIUM = 20
 JUDGE_WINDOW_DAYS = 21      # a day is judged against the same series' days this close to it
 MIN_JUDGED_DAYS = 3         # other traded days within the window needed before a day can be judged
 LIQUID_WINDOW_DAYS = 28     # an item ranks (movers, predicted movers) only with genuine trading
 LIQUID_MIN_DAYS = 10        # on at least this many of the last LIQUID_WINDOW_DAYS days
 THIN_LISTINGS = 5           # below this many listings, the median listing means nothing
 
-Series = tuple[str, str, int, str]  # (item id, granularity, stored rank, subtype) of completed-trade rows
+# (item id, granularity, stored rank, subtype) of completed-trade rows
+Series = tuple[str, str, int, str]
 
 
 def default_rank(max_rank: int | None) -> int | None:
@@ -156,7 +163,7 @@ def _off(price: float, typical: float) -> float:
 
 def _sets_out_of_line(conn: sqlite3.Connection,
                       series: dict[Series, list[sqlite3.Row]]) -> set[tuple[Series, str]]:
-    """Daily rows of sets priced above SET_PRICE_RATIO times the sum of their parts' prices that day."""
+    """Daily rows of sets priced above SET_PRICE_RATIO times their parts' summed prices that day."""
     sets = {key[0]: points for key, points in series.items() if key[1:] == ("day", UNRANKED, "")}
     if not sets:
         return set()
@@ -174,7 +181,7 @@ def _sets_out_of_line(conn: sqlite3.Connection,
 
 
 def _parts_by_day(conn: sqlite3.Connection, parts: list[str]) -> dict[str, float]:
-    """{day: sum of the parts' genuine medians times their quantity} for days on which every part traded."""
+    """{day: the parts' genuine medians times quantity, summed} for days every part traded."""
     if not parts:
         return {}
     marks = ",".join("?" * len(parts))
@@ -189,8 +196,11 @@ def _parts_by_day(conn: sqlite3.Connection, parts: list[str]) -> dict[str, float
 
 
 def liquid_series(conn: sqlite3.Connection) -> set[tuple[str, int]]:
-    """(item id, stored rank) series that traded genuinely on at least LIQUID_MIN_DAYS of the last
-    LIQUID_WINDOW_DAYS days. Thinner markets are too easy to move to rank in movers or forecasts."""
+    """(item id, stored rank) series that trade often enough to rank in movers and forecasts.
+
+    That is genuine trades on at least LIQUID_MIN_DAYS of the last LIQUID_WINDOW_DAYS days;
+    thinner markets are too easy to move.
+    """
     latest = conn.execute(
         "SELECT MAX(bucket) FROM price_stats WHERE source = 'closed' AND granularity = 'day'").fetchone()[0]
     if not latest:
@@ -203,8 +213,10 @@ def liquid_series(conn: sqlite3.Connection) -> set[tuple[str, int]]:
 
 
 def asking_price(median_price: float | None, lowest: float | None, listings: int | None) -> float | None:
-    """What sellers really ask: the median listing, or the lowest one when there are fewer than
-    THIN_LISTINGS listings (two or three joke listings make the median meaningless)."""
+    """What sellers really ask: the median listing, or the lowest one when listings are thin.
+
+    Below THIN_LISTINGS listings, two or three joke listings make the median meaningless.
+    """
     return median_price if (listings or 0) >= THIN_LISTINGS else lowest
 
 

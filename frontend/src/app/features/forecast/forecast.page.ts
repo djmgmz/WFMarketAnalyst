@@ -255,7 +255,7 @@ export class ForecastPage {
   protected readonly horizon = signal('7');
   protected readonly horizons = computed(() => Object.keys(this.report()?.horizons ?? {}));
   protected readonly selected = computed(() => this.report()?.horizons[this.horizon()] ?? null);
-  /** What the selected horizon covers, for sentences: "tomorrow" / "the next 7 days (average price)". */
+  /** The selected horizon in words: "tomorrow" or "the next 7 days (average price)". */
   protected readonly over = computed(() =>
     this.horizon() === '1' ? 'tomorrow' : `the next ${this.horizon()} days (average price)`);
   protected readonly label = horizonLabel;

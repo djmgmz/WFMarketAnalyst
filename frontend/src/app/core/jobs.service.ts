@@ -8,9 +8,8 @@ import { Job } from './models';
 const POLL_MS = 3000;
 
 /**
- * Status of the CLI jobs (backfill, catalog sync, recorder), polled from the
- * local API. Shared by the sidebar indicator, the Overview panel, and pages
- * that refresh themselves while a job is producing data.
+ * Status of the background jobs, polled from the local API. Shared by the sidebar indicator, the
+ * Overview panel, and pages that refresh themselves while a job is producing data.
  */
 @Injectable({ providedIn: 'root' })
 export class JobsService {

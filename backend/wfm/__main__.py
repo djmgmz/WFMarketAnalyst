@@ -118,7 +118,7 @@ def _cmd_check_prices(_: argparse.Namespace) -> None:
     from .prices import flag_suspect
 
     with session() as conn:
-        # Parts before sets (a set is checked against its parts); batches keep each write lock short.
+        # Parts before sets (a set is checked against its parts); batches keep write locks short.
         ids = [r[0] for r in conn.execute(
             """SELECT DISTINCT ps.item_id FROM price_stats ps JOIN items i ON i.id = ps.item_id
                ORDER BY COALESCE(i.set_root, 0), ps.item_id""")]

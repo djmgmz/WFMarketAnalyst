@@ -37,7 +37,10 @@ def test_list_refresh_keeps_detail_fields(client, conn, tmp_path):
 
 
 def test_item_details_commit_before_next_request(tmp_path):
-    """No write lock may be held while waiting on warframe.market (the 'database is locked' bug)."""
+    """No write lock is held while waiting on warframe.market.
+
+    Otherwise every other process writing to the database fails with "database is locked".
+    """
     db = tmp_path / "lock.db"
     conn = connect(db)
     init_db(conn)
@@ -64,7 +67,8 @@ def test_sync_plan_follows_stored_versions(client, conn):
 
     versions = ROUTES["/v2/versions"]["data"]["collections"]
     up_to_date = plan_sync(conn, versions)
-    assert (up_to_date.item_list, up_to_date.kinds) == (False, ())  # empty kinds are not refetched forever
+    # Empty kinds are not refetched forever.
+    assert (up_to_date.item_list, up_to_date.kinds) == (False, ())
 
     plan = plan_sync(conn, {**versions, "items": "v2", "liches": "v2"})
     assert plan.item_list is True
@@ -82,9 +86,10 @@ def test_new_items_version_does_not_refetch_existing_details(client, conn, tmp_p
 
 
 def test_interrupted_detail_refresh_resumes_instead_of_being_lost(client, conn, tmp_path):
-    """The old bug: a refresh stopped halfway was forgotten. Now it is just items lacking details."""
+    """A details refresh stopped halfway resumes with the items still lacking details."""
     first = with_market(tmp_path, lambda market: sync_catalog(conn, market, refresh_details=True, detail_limit=1))
-    assert first["details_forgotten"] == 2 and first["details"] == (1, 0)  # "stopped" after one item
+    # Stopped after one item.
+    assert first["details_forgotten"] == 2 and first["details"] == (1, 0)
     resumed = with_market(tmp_path, lambda market: sync_catalog(conn, market))
     assert resumed["details"] == (1, 0)  # picks up the remaining item
     assert conn.execute("SELECT COUNT(*) FROM items WHERE detail_synced_at IS NULL").fetchone()[0] == 0

@@ -18,7 +18,7 @@ export function formatPercent(value: number, signed = true): string {
   return signed && value > 0 ? `+${pct}%` : `${pct}%`;
 }
 
-/** What a forecast horizon predicts: tomorrow's price, or the average price over the next h days. */
+/** What a horizon predicts: tomorrow's price, or the average price over the next h days. */
 export function horizonLabel(horizon: number | string): string {
   return Number(horizon) === 1 ? 'Tomorrow' : `Next ${horizon} days (avg)`;
 }

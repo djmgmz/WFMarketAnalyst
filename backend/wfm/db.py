@@ -66,7 +66,8 @@ def init_db(conn: sqlite3.Connection) -> None:
     # Migrate existing tables first: the schema script recreates views that may use new columns.
     for table, column, definition in MIGRATIONS:
         columns = {r[1] for r in conn.execute(f"PRAGMA table_info({table})")}
-        if columns and column not in columns:  # no columns: the table is new and the schema creates it whole
+        # No columns: the table is new and the schema creates it whole
+        if columns and column not in columns:
             conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
     conn.commit()
     conn.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
@@ -75,9 +76,12 @@ def init_db(conn: sqlite3.Connection) -> None:
 
 async def retry_locked(conn: sqlite3.Connection, write: Callable[[], T], *,
                        attempts: int = LOCK_ATTEMPTS, pause: float = LOCK_PAUSE_SECONDS) -> T:
-    """Run `write` (which commits itself). If another process holds the write lock past the busy
-    timeout, roll back, wait `pause` seconds and try again, so one slow writer elsewhere does not
-    end a long-running job. Other errors, and the last failed attempt, are raised."""
+    """Run `write` (which commits itself), retrying while another process holds the write lock.
+
+    When the lock is held past the busy timeout, roll back, wait `pause` seconds and try again, so
+    one slow writer elsewhere does not end a long-running job. Other errors, and the last failed
+    attempt, are raised.
+    """
     for attempt in range(1, attempts + 1):
         try:
             return write()

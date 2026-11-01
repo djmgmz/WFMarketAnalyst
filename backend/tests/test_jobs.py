@@ -76,7 +76,7 @@ def test_ctrl_c_stops_and_errors_fail(job_db):
 
 
 def test_dashboard_stop_interrupts_the_job_like_ctrl_c(job_db):
-    """End to end: Stop sets the flag, the heartbeat raises KeyboardInterrupt, the job ends 'stopped'."""
+    """Stop sets the flag, the heartbeat raises KeyboardInterrupt, the job ends 'stopped'."""
     import time
 
     from wfm import jobs
@@ -122,7 +122,8 @@ def test_launched_job_keeps_a_stop_clicked_during_startup(job_db, monkeypatch):
     jobs.stop(c, "sync-catalog")  # clicked before the process wrote its first heartbeat
     c.close()
     stopped = threading.Event()
-    monkeypatch.setenv(jobs.LAUNCHED_BY_DASHBOARD, "sync-catalog")  # as _spawn sets it for the process
+    # As _spawn sets it for the process.
+    monkeypatch.setenv(jobs.LAUNCHED_BY_DASHBOARD, "sync-catalog")
     with Job.run("sync-catalog", db_path=job_db, flush_seconds=0.05, on_stop=stopped.set, terminal=False):
         assert stopped.wait(2), "the pending stop was lost when the job took over its row"
 
@@ -141,7 +142,8 @@ def test_job_endpoints(client, conn, monkeypatch):
     assert client.post("/api/jobs/nope/start").status_code == 404
     assert client.post("/api/jobs/backfill/start", json={"category": "Nope"}).status_code == 422
     assert client.post("/api/jobs/backfill/start", json={"slugs": ["missing_item"]}).status_code == 422
-    assert client.post("/api/jobs/backfill/start", json={"watchlist": True}).status_code == 422  # empty
+    # The watchlist is empty.
+    assert client.post("/api/jobs/backfill/start", json={"watchlist": True}).status_code == 422
     assert client.post("/api/jobs/backfill/start", json={}).status_code == 422  # no scope
     assert client.post("/api/jobs/backfill/start", json={"category": "Arcane"}).status_code == 202
     assert client.post("/api/jobs/backfill/start", json={"category": "Arcane"}).status_code == 409
@@ -153,7 +155,8 @@ def test_job_endpoints(client, conn, monkeypatch):
     runs = {j["name"]: j["run"] for j in client.get("/api/jobs").json()}
     assert runs["record"]["state"] == "stalled" and runs["backfill"]["state"] == "running"
     assert client.post("/api/jobs/backfill/stop").json()["outcome"] == "stopping"
-    assert client.post("/api/jobs/record/stop").json()["outcome"] == "cleared"  # its process is gone
+    # Its process is gone.
+    assert client.post("/api/jobs/record/stop").json()["outcome"] == "cleared"
 
 
 def test_terminal_lines_render_job_snapshots():
@@ -167,7 +170,8 @@ def test_terminal_lines_render_job_snapshots():
     rich, plain = progress_line("Backfill")(snap)
     assert rich.startswith("█") and "Backfill 2/4 (50%)" in rich and "ETA" in rich and "arcane_grace" in rich
     assert plain.startswith("Backfill 2/4 (50%) | ") and "1 failed" in plain and plain.isascii()
-    resumed = {**snap, "started_at": "2026-10-31T00:00:00Z", "detail": {"skipped": 2}}  # nothing fetched yet
+    # Nothing fetched yet.
+    resumed = {**snap, "started_at": "2026-10-31T00:00:00Z", "detail": {"skipped": 2}}
     assert "ETA" not in progress_line("Backfill")(resumed)[1]
     rich, plain = recorder_line({**snap, "done": 7})
     assert "connected" in rich and "7 new orders" in rich and "3 watchlist prices" in rich and plain.isascii()

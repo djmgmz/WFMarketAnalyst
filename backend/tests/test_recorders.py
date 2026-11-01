@@ -23,7 +23,8 @@ def test_backfill_resumes_by_skipping_items_fetched_today(client, conn, tmp_path
             return records
 
     slugs = ["arcane_energize", "ash_prime_systems"]
-    asyncio.run(backfill_stats(conn, CountingMarket(), slugs[:1]))  # a run that ended after the first item
+    # A run that ended after the first item.
+    asyncio.run(backfill_stats(conn, CountingMarket(), slugs[:1]))
 
     again, notes = CountingMarket(), Notes()
     result = asyncio.run(backfill_stats(conn, again, slugs, notes))
@@ -34,7 +35,8 @@ def test_backfill_resumes_by_skipping_items_fetched_today(client, conn, tmp_path
     asyncio.run(backfill_stats(conn, forced, slugs, refetch=True))
     assert forced.asked == slugs
 
-    conn.execute("UPDATE price_stats SET fetched_at = '2026-01-01T12:00:00Z'")  # fetched on an earlier day
+    # Fetched on an earlier day.
+    conn.execute("UPDATE price_stats SET fetched_at = '2026-01-01T12:00:00Z'")
     conn.commit()
     next_day = CountingMarket()
     asyncio.run(backfill_stats(conn, next_day, slugs))
@@ -56,7 +58,8 @@ def test_store_orders_is_idempotent(conn):
     order = {"id": "o1", "item_id": "i1", "type": "sell", "platinum": 8, "quantity": 1}
     assert store_orders(conn, [order]) == 1
     assert store_orders(conn, [order]) == 0
-    assert conn.execute("SELECT created_at FROM orders_seen").fetchone()[0]  # falls back to seen time
+    # Falls back to the time it was seen.
+    assert conn.execute("SELECT created_at FROM orders_seen").fetchone()[0]
 
 
 def test_top_summary():

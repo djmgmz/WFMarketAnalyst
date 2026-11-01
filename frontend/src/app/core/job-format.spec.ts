@@ -26,9 +26,10 @@ describe('job formatting', () => {
   });
 
   it('leaves skipped items (a resume) out of the pace', () => {
-    // 60 done, 50 of them skipped instantly: 10 fetched in 10 minutes -> 40 left = 40 minutes, not 6m 40s.
+    // 60 done, 50 skipped instantly: 10 fetched in 10 min -> 40 left = 40 min, not 6m 40s.
     const resumed = { ...base, done: 60, detail: { skipped: 50 } };
     expect(eta(resumed, Date.parse('2026-10-31T00:10:00Z'))).toBe('40m 00s');
-    expect(eta({ ...resumed, done: 50 }, Date.now())).toBeNull(); // nothing fetched yet: no pace to go on
+    // Nothing fetched yet: no pace to go on.
+    expect(eta({ ...resumed, done: 50 }, Date.now())).toBeNull();
   });
 });

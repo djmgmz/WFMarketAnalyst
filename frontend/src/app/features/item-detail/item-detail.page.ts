@@ -275,8 +275,9 @@ export class ItemDetailPage {
     }
     const forecasts = this.granularity() === 'day' ? this.forecast.value() ?? [] : [];
     if (forecasts.length) {
-      // Forecasts continue the trade-price line: same color, dashed, with their likely range. Tomorrow's price is a
-      // point on day 1; a longer horizon is an average over days 1..h, so it is drawn flat across those days.
+      // Forecasts continue the trade-price line: same color, dashed, with their likely range.
+      // Tomorrow's price is a point on day 1; a longer horizon is an average over days 1..h, so it
+      // is drawn flat across those days.
       const t0 = Date.parse(forecasts[0].base_date);
       const at = (days: number) => t0 + days * 86_400_000;
       for (const f of forecasts) {

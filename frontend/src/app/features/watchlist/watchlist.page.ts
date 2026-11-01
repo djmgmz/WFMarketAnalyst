@@ -9,7 +9,7 @@ import { EmptyStateComponent } from '../../shared/empty-state.component';
 import { IconComponent } from '../../shared/icon.component';
 import { ItemThumbComponent } from '../../shared/item-thumb.component';
 
-/** Items the user tracks, with a target price. The recorder snapshots these every 15 minutes. */
+/** Items the user tracks, with a target price. The order recorder snapshots their best prices. */
 @Component({
   selector: 'app-watchlist-page',
   imports: [RouterLink, EmptyStateComponent, ItemThumbComponent, IconComponent],

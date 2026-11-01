@@ -26,9 +26,9 @@ class Settings:
     platform: str = _env("WFM_PLATFORM", "pc")
     crossplay: bool = _env("WFM_CROSSPLAY", "true").lower() == "true"
     language: str = "en"
-    # The public limit is 3 requests per second; stay comfortably below it.
-    # Enforced across all processes by client.SharedRateLimiter.
-    requests_per_second: float = min(float(_env("WFM_RPS", "2.5")), 3.0)  # never above the public limit
+    # The public limit is 3 requests per second: stay comfortably below it, and never let WFM_RPS
+    # raise the rate past it. Enforced across all processes by client.SharedRateLimiter.
+    requests_per_second: float = min(float(_env("WFM_RPS", "2.5")), 3.0)
     # The API rules ask every client to identify itself. Set WFM_CONTACT to a
     # repository URL or email so the warframe.market team can reach you.
     contact: str = _env("WFM_CONTACT", "local portfolio project")

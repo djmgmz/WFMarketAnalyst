@@ -161,7 +161,7 @@ class JobStart(BaseModel):
 
 @app.post("/api/jobs/{name}/start", status_code=202)
 def start_job(name: str, body: JobStart | None = None, conn: sqlite3.Connection = Db) -> dict[str, Any]:
-    """Launch a job in the background. The catalog sync resumes where it stopped."""
+    """Launch a job in the background. A resumable job picks up where it stopped."""
     body = body or JobStart()
     with _job_errors(name):
         jobs.start(conn, name, jobs.Scope(category=body.category, slugs=tuple(body.slugs), watchlist=body.watchlist,
@@ -367,7 +367,7 @@ def movers(
 
 @app.get("/api/items/{slug}/forecast")
 def item_forecast(slug: str, conn: sqlite3.Connection = Db, rank: int | None = None) -> list[dict[str, Any]]:
-    """Stored forecasts for one item at a rank (default: the item's default rank), one per horizon."""
+    """Stored forecasts for one item, one per horizon, at a rank (default: its default rank)."""
     item = _item_or_404(conn, slug)
     return forecast.forecast_for(conn, item["id"], rank if rank is not None else prices.default_rank(item["max_rank"]))
 

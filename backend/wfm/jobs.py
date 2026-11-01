@@ -66,7 +66,7 @@ LAUNCHED_BY_DASHBOARD = "WFM_LAUNCHED_JOB"
 
 @dataclass(frozen=True)
 class Scope:
-    """What a backfill covers: item slugs, a whole category, the watchlist, or every item with history."""
+    """What a backfill covers: slugs, a category, the watchlist, or every item with history."""
 
     category: str | None = None
     slugs: tuple[str, ...] = ()
@@ -405,7 +405,10 @@ def start(conn: sqlite3.Connection, name: str, scope: Scope = Scope()) -> None:
 
 
 def stop(conn: sqlite3.Connection, name: str) -> Literal["stopping", "cleared"]:
-    """Ask a running job to stop, or close the record of one whose process died. Raises KeyError, JobConflict."""
+    """Ask a running job to stop, or close the record of one whose process died.
+
+    Raises KeyError for an unknown job and JobConflict when it is not running.
+    """
     _spec(name)
     row = conn.execute("SELECT * FROM jobs WHERE name = ?", (name,)).fetchone()
     if not row or row["status"] != "running":
@@ -423,7 +426,10 @@ def stop(conn: sqlite3.Connection, name: str) -> Literal["stopping", "cleared"]:
 
 
 def _spawn(name: str, args: list[str]) -> None:
-    """Run `python -m wfm <args>` detached from the API (survives reloads), logging to data/logs/<name>.log."""
+    """Run `python -m wfm <args>` detached from the API, so it survives reloads.
+
+    Output goes to data/logs/<name>.log.
+    """
     log_dir = Path(settings.db_path).parent / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
     with open(log_dir / f"{name}.log", "a", encoding="utf-8") as log:

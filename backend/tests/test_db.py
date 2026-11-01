@@ -55,7 +55,7 @@ def test_migration_adds_columns_to_existing_jobs_table(tmp_path):
     old = sqlite3.connect(db)
     old.execute("CREATE TABLE jobs (name TEXT PRIMARY KEY, status TEXT NOT NULL, started_at TEXT NOT NULL, "
                 "heartbeat_at TEXT NOT NULL, detail TEXT NOT NULL DEFAULT '{}')")
-    # A price table from before the suspect column, which the item_prices view now reads.
+    # A price table from an older schema, without the suspect column the item_prices view reads.
     old.execute("CREATE TABLE price_stats (item_id TEXT NOT NULL, source TEXT NOT NULL, granularity TEXT NOT NULL, "
                 "bucket TEXT NOT NULL, mod_rank INTEGER NOT NULL DEFAULT -1, subtype TEXT NOT NULL DEFAULT '', "
                 "order_type TEXT NOT NULL DEFAULT '', volume INTEGER, median REAL, fetched_at TEXT NOT NULL)")
@@ -65,5 +65,6 @@ def test_migration_adds_columns_to_existing_jobs_table(tmp_path):
     init_db(c)
     assert "stop_requested" in {r[1] for r in c.execute("PRAGMA table_info(jobs)")}
     assert "suspect" in {r[1] for r in c.execute("PRAGMA table_info(price_stats)")}
-    assert c.execute("SELECT COUNT(*) FROM item_prices").fetchone()[0] == 0  # the view works on the old table
+    # The view works on the migrated table.
+    assert c.execute("SELECT COUNT(*) FROM item_prices").fetchone()[0] == 0
     c.close()

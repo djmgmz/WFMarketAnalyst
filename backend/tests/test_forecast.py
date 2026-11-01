@@ -16,12 +16,14 @@ def test_forecast_features_never_look_ahead(conn):
 
     _seed_history(conn, trend_items=1, noise_items=0, days=40)
     before = forecast._dataset(conn)
-    conn.execute("UPDATE price_stats SET median = median * 3 WHERE bucket >= '2026-07-31'")  # change the future
+    # Change only the future.
+    conn.execute("UPDATE price_stats SET median = median * 3 WHERE bucket >= '2026-07-31'")
     after = forecast._dataset(conn)
     day = pd_timestamp("2026-07-25")
     feature_cols = forecast.NUMERIC + ["band"]
     assert before.loc[before["date"] == day, feature_cols].equals(after.loc[after["date"] == day, feature_cols])
-    assert not before.loc[before["date"] == day, "y_7"].equals(after.loc[after["date"] == day, "y_7"])  # only the target moves
+    # Only the target moves.
+    assert not before.loc[before["date"] == day, "y_7"].equals(after.loc[after["date"] == day, "y_7"])
 
 
 def test_forecast_target_is_the_average_over_the_next_h_days(conn):
@@ -35,7 +37,8 @@ def test_forecast_target_is_the_average_over_the_next_h_days(conn):
     week = [math.log(data.loc[day + pd_timedelta(k), "price"]) for k in range(1, 8)]
     assert data.loc[day, "y_7"] == pytest.approx(sum(week) / 7 - math.log(data.loc[day, "price"]))
     tomorrow = data.loc[day + pd_timedelta(1), "price"]
-    assert data.loc[day, "y_1"] == pytest.approx(math.log(tomorrow / data.loc[day, "price"]))  # h = 1: tomorrow
+    # h = 1 is tomorrow's price.
+    assert data.loc[day, "y_1"] == pytest.approx(math.log(tomorrow / data.loc[day, "price"]))
 
     # A day without trades carries the last price forward; a week without any trades has no target.
     conn.execute("DELETE FROM price_stats WHERE bucket LIKE '2026-07-27%'")
@@ -74,7 +77,8 @@ def test_thin_or_faked_series_get_the_baseline_and_never_reach_predicted_movers(
     methods = dict(conn.execute("SELECT item_id, method FROM forecasts WHERE horizon = 7"))
     assert methods["trend_0"] == "baseline" and methods["trend_1"] == methods["trend_2"] == "model"
     week = forecast.forecast_for(conn, "trend_1", None)[1]
-    assert week["base_price"] < 1000 and week["high"] < 1000  # the faked day did not leak into the forecast
+    # The faked day did not leak into the forecast.
+    assert week["base_price"] < 1000 and week["high"] < 1000
     assert "trend_0" not in [m["item_id"] for m in forecast.predicted_movers(conn, 7, 50)["gainers"]]
 
 
@@ -96,7 +100,8 @@ def test_forecast_uses_the_model_only_where_it_beats_no_change(conn):
     assert [f["horizon"] for f in trend] == [1, 7]
     week_ahead = trend[1]
     assert week_ahead["low"] <= week_ahead["predicted"] <= week_ahead["high"]
-    assert week_ahead["predicted"] > week_ahead["base_price"] * 1.015  # follows the trend: ~2.4% over days 1-7 on average
+    # Follows the trend: about 2.4% over days 1-7 on average.
+    assert week_ahead["predicted"] > week_ahead["base_price"] * 1.015
     noise = forecast.forecast_for(conn, "noise_0", None)[1]
     assert noise["predicted"] == noise["base_price"] and noise["low"] < noise["base_price"] < noise["high"]
     assert forecast.latest_report(conn)["made_at"] == report["made_at"]
